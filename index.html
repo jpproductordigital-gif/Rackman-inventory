@@ -249,6 +249,7 @@ addEventListener('storage', e => { if (DEMO && e.key === CLAVE_DEMO && yo) { Dat
    ========================================================= */
 const art = id => oficial('articulos')[id];
 const ubic = id => oficial('ubicaciones')[id];
+const activos = () => lista(oficial('articulos')).filter(a => !a.inactivo);
 const artPorCodigo = c => lista(oficial('articulos')).find(a => mismo(a.codigo, c));
 const ubicPorCodigo = c => { const us = lista(oficial('ubicaciones')); return us.find(u => mismo(u.codigo, c)) || (String(c || '').trim() ? (us.filter(u => u.nombre && mismo(u.nombre, c)).length === 1 ? us.find(u => u.nombre && mismo(u.nombre, c)) : undefined) : undefined); };
 /* Cómo se muestra una ubicación: código y, si tiene, su nombre */
@@ -263,7 +264,7 @@ const ubicacionesOrdenadas = () => lista(oficial('ubicaciones')).sort((a, b) => 
 function analisisFlujo(dias = 30, diasInmovil = 60) {
   const desde = ahora() - dias * 864e5, inmovil = diasInmovil * 864e5, salidas = {}, ultimo = {};
   compsVigentes().filter(c => c.tipo === 'egreso').forEach(c => { if (c.fecha >= desde) salidas[c.articulo] = (salidas[c.articulo] || 0) + c.cantidad; ultimo[c.articulo] = Math.max(ultimo[c.articulo] || 0, c.fecha); });
-  const filas = lista(oficial('articulos')).map(a => ({ a, stock: stockDe(a.id), salidas: salidas[a.id] || 0, ultimo: ultimo[a.id] || 0 }));
+  const filas = lista(oficial('articulos')).filter(a => !a.inactivo).map(a => ({ a, stock: stockDe(a.id), salidas: salidas[a.id] || 0, ultimo: ultimo[a.id] || 0 }));
   const conMov = filas.filter(f => f.salidas > 0).sort((x, y) => y.salidas - x.salidas), corte = Math.max(1, Math.ceil(conMov.length / 3));
   const alta = new Set(conMov.slice(0, corte).map(f => f.a.id));
   filas.forEach(f => { f.clase = f.stock < 0 ? 'neg' : f.stock === 0 ? 'cero' : alta.has(f.a.id) ? 'alta' : (ahora() - Math.max(f.ultimo, f.a.alta || 0) > inmovil) ? 'inmovil' : 'media'; });
@@ -430,7 +431,7 @@ addEventListener('appinstalled', () => { const b = $('btnInstalar'); if (b) b.hi
 let filtro = '';
 function render() {
   if (!yo) return;
-  const arts = lista(oficial('articulos'));
+  const arts = activos();
   const filas = arts.map(a => ({ a, stock: stockDe(a.id), pu: Object.entries(porUbicacion(a.id)).filter(([, v]) => v !== 0) }));
   const cuenta = f => filas.filter(f).length;
   const K = [['', 'Artículos', cuenta(() => true)], ['disp', 'Con stock', cuenta(f => f.stock > 0)], ['bajo', 'Bajo mínimo', cuenta(f => f.a.minimo && f.stock > 0 && f.stock <= f.a.minimo)], ['cero', 'Sin stock', cuenta(f => f.stock <= 0)]];

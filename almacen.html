@@ -314,6 +314,7 @@ addEventListener('storage', e => { if (DEMO && e.key === CLAVE_DEMO && yo) { Dat
    ========================================================= */
 const art = id => oficial('articulos')[id];
 const ubic = id => oficial('ubicaciones')[id];
+const activos = () => lista(oficial('articulos')).filter(a => !a.inactivo);
 const artPorCodigo = c => lista(oficial('articulos')).find(a => mismo(a.codigo, c));
 const ubicPorCodigo = c => { const us = lista(oficial('ubicaciones')); return us.find(u => mismo(u.codigo, c)) || (String(c || '').trim() ? (us.filter(u => u.nombre && mismo(u.nombre, c)).length === 1 ? us.find(u => u.nombre && mismo(u.nombre, c)) : undefined) : undefined); };
 /* Cómo se muestra una ubicación: código y, si tiene, su nombre */
@@ -328,7 +329,7 @@ const ubicacionesOrdenadas = () => lista(oficial('ubicaciones')).sort((a, b) => 
 function analisisFlujo(dias = 30, diasInmovil = 60) {
   const desde = ahora() - dias * 864e5, inmovil = diasInmovil * 864e5, salidas = {}, ultimo = {};
   compsVigentes().filter(c => c.tipo === 'egreso').forEach(c => { if (c.fecha >= desde) salidas[c.articulo] = (salidas[c.articulo] || 0) + c.cantidad; ultimo[c.articulo] = Math.max(ultimo[c.articulo] || 0, c.fecha); });
-  const filas = lista(oficial('articulos')).map(a => ({ a, stock: stockDe(a.id), salidas: salidas[a.id] || 0, ultimo: ultimo[a.id] || 0 }));
+  const filas = lista(oficial('articulos')).filter(a => !a.inactivo).map(a => ({ a, stock: stockDe(a.id), salidas: salidas[a.id] || 0, ultimo: ultimo[a.id] || 0 }));
   const conMov = filas.filter(f => f.salidas > 0).sort((x, y) => y.salidas - x.salidas), corte = Math.max(1, Math.ceil(conMov.length / 3));
   const alta = new Set(conMov.slice(0, corte).map(f => f.a.id));
   filas.forEach(f => { f.clase = f.stock < 0 ? 'neg' : f.stock === 0 ? 'cero' : alta.has(f.a.id) ? 'alta' : (ahora() - Math.max(f.ultimo, f.a.alta || 0) > inmovil) ? 'inmovil' : 'media'; });
@@ -505,7 +506,7 @@ function render() {
 /* ---------- Stock oficial + pendiente ---------- */
 function proyeccion() {
   const m = {};
-  lista(oficial('articulos')).forEach(a => m[a.codigo.toLowerCase()] = { codigo: a.codigo, nombre: a.nombre, unidad: a.unidad, a, oficial: stockDe(a.id), pend: 0, props: [] });
+  activos().forEach(a => m[a.codigo.toLowerCase()] = { codigo: a.codigo, nombre: a.nombre, unidad: a.unidad, a, oficial: stockDe(a.id), pend: 0, props: [] });
   pendientes().forEach(p => {
     const k = String(p.codigo).toLowerCase();
     const f = m[k] || (m[k] = { codigo: p.codigo, nombre: p.nombre || '', unidad: p.unidad || '', oficial: 0, pend: 0, props: [], nuevo: true });
@@ -559,6 +560,7 @@ function infoArticulo() {
   const c = $('movCodigo').value.trim(), a = artPorCodigo(c), u = ubicPorCodigo($('movUbic').value), el = $('infoArticulo');
   if (!c) { el.textContent = ''; return; }
   if (!a) { el.innerHTML = mov === 'entrada' && $('tipoEntrada').value === 'nuevo' ? 'Código nuevo: completá el nombre del artículo.' : pendienteDeAlta(c) ? '<span class="etq pend">Pendiente de alta</span> Este artículo todavía no fue aprobado.' : `<span class="neg">No existe un artículo con ese código.</span>${mov === 'ajuste' ? '' : ' <button class="btn chico acento" type="button" data-pasar-nuevo>Registrar como artículo nuevo</button>'}`; return; }
+  if (a.inactivo) { el.innerHTML = `<b>${esc(a.nombre)}</b> <span class="etq anulado">Dado de baja</span> Ya no se trabaja con este artículo. Si volvió, pedile al administrador que lo reactive.`; return; }
   el.innerHTML = `<b>${esc(a.nombre)}</b> · stock oficial ${stockDe(a.id)} ${esc(a.unidad)}${u ? ` · en <span class="mono">${esc(u.codigo)}</span>: ${stockDe(a.id, u.id)}` : ''}`;
 }
 $('movCodigo').addEventListener('input', infoArticulo);
@@ -623,6 +625,7 @@ $('btnEnviar').addEventListener('click', async () => {
     if (!Number.isInteger(cant) || (mov === 'ajuste' ? cant < 0 : cant < 1)) throw new Error('Indicá una cantidad válida.');
     const u = ubicacion ? ubicPorCodigo(ubicacion) : null;
     if (ubicacion && !u) throw new Error('Esa ubicación no existe.');
+    if (artPorCodigo(codigo)?.inactivo) throw new Error('Ese artículo está dado de baja. Pedile al administrador que lo reactive.');
     const existe = artPorCodigo(codigo) || pendienteDeAlta(codigo);
     let datos;
     if (mov === 'entrada') {

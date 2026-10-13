@@ -195,6 +195,7 @@
         <p class="ayuda" id="infoArt"></p>
         <div class="botones"><button class="btn acento" id="btnGuardarArt">Dar de alta</button><button class="btn sec" id="btnCancelarArt" hidden>Cancelar edición</button></div>
       </div>
+      <div class="segmento" id="segArt"><button class="activo" data-vart="activos">Activos</button><button data-vart="baja">Dados de baja</button></div>
       <input class="buscador" id="buscarArt" type="search" placeholder="Buscar por nombre o código…">
       <div class="caja tabla-cont"><table><thead><tr><th>Código</th><th>Artículo</th><th>Unidad</th><th class="num">Mínimo</th><th class="num">Stock</th><th></th></tr></thead><tbody id="tablaArt"></tbody></table></div>
     </section>
@@ -417,6 +418,7 @@ addEventListener('storage', e => { if (DEMO && e.key === CLAVE_DEMO && yo) { Dat
    ========================================================= */
 const art = id => oficial('articulos')[id];
 const ubic = id => oficial('ubicaciones')[id];
+const activos = () => lista(oficial('articulos')).filter(a => !a.inactivo);
 const artPorCodigo = c => lista(oficial('articulos')).find(a => mismo(a.codigo, c));
 const ubicPorCodigo = c => { const us = lista(oficial('ubicaciones')); return us.find(u => mismo(u.codigo, c)) || (String(c || '').trim() ? (us.filter(u => u.nombre && mismo(u.nombre, c)).length === 1 ? us.find(u => u.nombre && mismo(u.nombre, c)) : undefined) : undefined); };
 /* Cómo se muestra una ubicación: código y, si tiene, su nombre */
@@ -431,7 +433,7 @@ const ubicacionesOrdenadas = () => lista(oficial('ubicaciones')).sort((a, b) => 
 function analisisFlujo(dias = 30, diasInmovil = 60) {
   const desde = ahora() - dias * 864e5, inmovil = diasInmovil * 864e5, salidas = {}, ultimo = {};
   compsVigentes().filter(c => c.tipo === 'egreso').forEach(c => { if (c.fecha >= desde) salidas[c.articulo] = (salidas[c.articulo] || 0) + c.cantidad; ultimo[c.articulo] = Math.max(ultimo[c.articulo] || 0, c.fecha); });
-  const filas = lista(oficial('articulos')).map(a => ({ a, stock: stockDe(a.id), salidas: salidas[a.id] || 0, ultimo: ultimo[a.id] || 0 }));
+  const filas = lista(oficial('articulos')).filter(a => !a.inactivo).map(a => ({ a, stock: stockDe(a.id), salidas: salidas[a.id] || 0, ultimo: ultimo[a.id] || 0 }));
   const conMov = filas.filter(f => f.salidas > 0).sort((x, y) => y.salidas - x.salidas), corte = Math.max(1, Math.ceil(conMov.length / 3));
   const alta = new Set(conMov.slice(0, corte).map(f => f.a.id));
   filas.forEach(f => { f.clase = f.stock < 0 ? 'neg' : f.stock === 0 ? 'cero' : alta.has(f.a.id) ? 'alta' : (ahora() - Math.max(f.ultimo, f.a.alta || 0) > inmovil) ? 'inmovil' : 'media'; });
@@ -631,11 +633,12 @@ async function registrarEntrada({ tipo, codigo, nombre, unidad, minimo, cantidad
     if (!String(nombre || '').trim()) throw new Error('Falta el nombre del artículo nuevo.');
     a = { id: nid('A'), codigo: codigo.trim(), nombre: nombre.trim(), unidad: unidad || 'unidad', minimo: +minimo || 0, alta: ahora() }; cambios[`${OF}articulos/${a.id}`] = a; }
   else if (tipo === 'nuevo') throw new Error('Ese artículo ya existe. Usá "Reposición".');
+  else if (a.inactivo) throw new Error(`${a.nombre} está dado de baja. Reactivalo en Artículos para volver a moverlo.`);
   const u = ubicPorCodigo(ubicacion); if (!u) throw new Error(`La ubicación ${ubicacion || '(vacía)'} no existe.`);
   return emitirComprobante(n => ({ tipo, articulo: a.id, ubicacion: u.id, cantidad, nota: nota || '', ref: ref || '', items: planIngreso(a.id, u.id, cantidad, cambios, n, tipo) }), cambios, extra, despues);
 }
 async function registrarSalida({ codigo, cantidad, ubicacion, nota }, extra, despues) {
-  const a = artPorCodigo(codigo); if (!a) throw new Error(`No existe un artículo con el código ${codigo}.`);
+  const a = artPorCodigo(codigo); if (!a) throw new Error(`No existe un artículo con el código ${codigo}.`); if (a.inactivo) throw new Error(`${a.nombre} está dado de baja. Reactivalo en Artículos para volver a moverlo.`);
   const u = ubicacion ? ubicPorCodigo(ubicacion) : null; if (ubicacion && !u) throw new Error(`La ubicación ${ubicacion} no existe.`);
   const cambios = {};
   return emitirComprobante(n => { const items = planDescuento(a.id, u ? u.id : null, cantidad, cambios, n);
@@ -644,7 +647,7 @@ async function registrarSalida({ codigo, cantidad, ubicacion, nota }, extra, des
 /* Traslado: mueve unidades de una ubicación a otra sin cambiar el stock total.
    Cada lote que sale da origen a un lote nuevo en el destino que conserva su fecha (para el orden FIFO) y apunta al lote original. */
 async function registrarTraslado({ codigo, cantidad, ubicacion, destino, nota }, extra, despues) {
-  const a = artPorCodigo(codigo); if (!a) throw new Error(`No existe un artículo con el código ${codigo}.`);
+  const a = artPorCodigo(codigo); if (!a) throw new Error(`No existe un artículo con el código ${codigo}.`); if (a.inactivo) throw new Error(`${a.nombre} está dado de baja. Reactivalo en Artículos para volver a moverlo.`);
   const u = ubicPorCodigo(ubicacion), d = ubicPorCodigo(destino);
   if (!u) throw new Error(`La ubicación de origen ${ubicacion || '(vacía)'} no existe.`); if (!d) throw new Error(`La ubicación de destino ${destino || '(vacía)'} no existe.`);
   if (u.id === d.id) throw new Error('El origen y el destino son la misma ubicación.');
@@ -685,6 +688,7 @@ async function anular(cid, motivo) {
 /* Qué pasaría si se aprueba: problemas que impiden aprobar y avisos */
 function diagnostico(p, corr = {}) {
   const d = { ...p, ...corr }, a = artPorCodigo(d.codigo), u = d.ubicacion ? ubicPorCodigo(d.ubicacion) : null, problemas = [], avisos = [];
+  if (a?.inactivo && d.tipo !== 'ajuste') problemas.push('El artículo está dado de baja: reactivalo en Artículos o rechazá el registro.');
   if (d.ubicacion && !u) problemas.push(`La ubicación ${d.ubicacion} no existe.`);
   if (d.tipo === 'entrada') {
     if (!a && d.subtipo !== 'nuevo') problemas.push('El artículo no existe: corregilo como ingreso nuevo con nombre, o rechazalo.');
@@ -828,13 +832,34 @@ $('buscarStock').addEventListener('input', pintarStock);
 document.addEventListener('click', e => { const tr = e.target.closest('[data-art]'); if (tr) verArticulo(tr.dataset.art); });
 
 /* ---------- Artículos: alta y edición sin mover stock ---------- */
-let editandoArt = null;
+let editandoArt = null, verArt = 'activos';
+$('segArt').addEventListener('click', e => { const b = e.target.closest('[data-vart]'); if (!b) return; verArt = b.dataset.vart; document.querySelectorAll('#segArt button').forEach(x => x.classList.toggle('activo', x === b)); pintarArticulos(); });
+/* Tuvo movimientos o tiene registros del almacén pendientes: entonces no se borra, se da de baja */
+const tieneHistoria = a => lotesDe(a.id).length > 0 || lista(oficial('comprobantes')).some(c => c.articulo === a.id) || pendientes().some(p => mismo(p.codigo, a.codigo));
+document.addEventListener('click', async e => {
+  const bj = e.target.closest('[data-baja-art]'); if (bj) { const a = art(bj.dataset.bajaArt); if (!a) return; const s = stockDe(a.id);
+    if (s !== 0) return toast(`Todavía hay ${s} ${a.unidad} de ${a.nombre}. Dejá el stock en 0 (salida o ajuste) antes de darlo de baja.`);
+    if (pendientes().some(p => mismo(p.codigo, a.codigo))) return toast('Hay registros del almacén pendientes de este artículo: resolvelos primero en la Bandeja.');
+    const m = prompt(`¿Dar de baja ${a.nombre}? Deja de aparecer en el stock y en las listas, pero su historial se conserva. Motivo (opcional):`); if (m === null) return;
+    await Datos.escribir({ [`${OF}articulos/${a.id}/inactivo`]: true, [`${OF}articulos/${a.id}/bajaFecha`]: ahora(), [`${OF}articulos/${a.id}/bajaPor`]: yo.email, [`${OF}articulos/${a.id}/bajaMotivo`]: m.trim() });
+    toast(`${a.nombre} dado de baja`); return; }
+  const re = e.target.closest('[data-reactivar-art]'); if (re) { const a = art(re.dataset.reactivarArt); if (!a) return;
+    await Datos.escribir({ [`${OF}articulos/${a.id}/inactivo`]: null, [`${OF}articulos/${a.id}/reactivado`]: ahora() }); toast(`${a.nombre} reactivado`); return; }
+  const bo = e.target.closest('[data-borrar-art]'); if (bo) { const a = art(bo.dataset.borrarArt); if (!a) return;
+    if (tieneHistoria(a)) return toast('Ese artículo tiene historial: solo se puede dar de baja.');
+    if (!confirm(`¿Borrar ${a.nombre} (${a.codigo})? Nunca tuvo movimientos, así que se borra del todo.`)) return;
+    await Datos.escribir({ [`${OF}articulos/${a.id}`]: null }); toast('Artículo borrado'); }
+});
 function pintarArticulos() {
   const q = $('buscarArt').value.trim().toLowerCase();
-  const as = lista(oficial('articulos')).filter(a => !q || `${a.codigo} ${a.nombre}`.toLowerCase().includes(q)).sort((x, y) => x.nombre.localeCompare(y.nombre));
-  $('tablaArt').innerHTML = as.length ? as.slice(0, 500).map(a => { const s = stockDe(a.id); return `<tr><td class="mono">${esc(a.codigo)}</td><td>${esc(a.nombre)}</td><td>${esc(a.unidad)}</td><td class="num">${a.minimo || 0}</td>
-    <td class="num ${s < 0 ? 'neg' : s === 0 ? 'cero' : ''}">${s}</td><td style="white-space:nowrap"><button class="btn sec chico" data-editar-art="${a.id}">Editar</button> <button class="btn sec chico" data-entrada-art="${esc(a.codigo)}">Entrada</button></td></tr>`; }).join('')
-    : `<tr><td colspan="6" class="ayuda">${lista(oficial('articulos')).length ? 'No hay artículos con esa búsqueda.' : 'Todavía no hay artículos. Dá de alta el primero con el formulario de arriba.'}</td></tr>`;
+  const baja = verArt === 'baja';
+  const as = lista(oficial('articulos')).filter(a => !!a.inactivo === baja && (!q || `${a.codigo} ${a.nombre}`.toLowerCase().includes(q))).sort((x, y) => x.nombre.localeCompare(y.nombre));
+  $('tablaArt').innerHTML = as.length ? as.slice(0, 500).map(a => { const s = stockDe(a.id), usado = tieneHistoria(a);
+    const acciones = baja ? `<button class="btn sec chico" data-reactivar-art="${a.id}">Reactivar</button>`
+      : `<button class="btn sec chico" data-editar-art="${a.id}">Editar</button> <button class="btn sec chico" data-entrada-art="${esc(a.codigo)}">Entrada</button> ${usado ? `<button class="btn sec chico" data-baja-art="${a.id}">Dar de baja</button>` : `<button class="btn peligro chico" data-borrar-art="${a.id}">Borrar</button>`}`;
+    return `<tr><td class="mono">${esc(a.codigo)}</td><td>${esc(a.nombre)}${baja ? `<div class="ayuda" style="margin:2px 0 0">De baja desde ${fmtD(a.bajaFecha)}${a.bajaMotivo ? ` · ${esc(a.bajaMotivo)}` : ''}</div>` : ''}</td><td>${esc(a.unidad)}</td><td class="num">${a.minimo || 0}</td>
+    <td class="num ${s < 0 ? 'neg' : s === 0 ? 'cero' : ''}">${s}</td><td style="white-space:nowrap">${acciones}</td></tr>`; }).join('')
+    : `<tr><td colspan="6" class="ayuda">${baja ? 'No hay artículos dados de baja.' : lista(oficial('articulos')).length ? 'No hay artículos con esa búsqueda.' : 'Todavía no hay artículos. Dá de alta el primero con el formulario de arriba.'}</td></tr>`;
   infoArt();
 }
 function infoArt() {

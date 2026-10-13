@@ -249,7 +249,10 @@ addEventListener('storage', e => { if (DEMO && e.key === CLAVE_DEMO && yo) { Dat
 const art = id => oficial('articulos')[id];
 const ubic = id => oficial('ubicaciones')[id];
 const artPorCodigo = c => lista(oficial('articulos')).find(a => mismo(a.codigo, c));
-const ubicPorCodigo = c => lista(oficial('ubicaciones')).find(u => mismo(u.codigo, c));
+const ubicPorCodigo = c => { const us = lista(oficial('ubicaciones')); return us.find(u => mismo(u.codigo, c)) || (String(c || '').trim() ? (us.filter(u => u.nombre && mismo(u.nombre, c)).length === 1 ? us.find(u => u.nombre && mismo(u.nombre, c)) : undefined) : undefined); };
+/* Cómo se muestra una ubicación: código y, si tiene, su nombre */
+const verUbic = u => u ? `${esc(u.codigo)}${u.nombre ? ` <span class="ayuda" style="font-family:var(--sans)">· ${esc(u.nombre)}</span>` : ''}` : 'sin ubicación';
+const opcionesUbic = () => ubicacionesOrdenadas().map(u => `<option value="${esc(u.codigo)}">${esc([u.nombre, u.descripcion].filter(Boolean).join(' — '))}</option>`).join('');
 const lotesDe = (aid, uid) => lista(oficial('lotes')).filter(l => l.articulo === aid && (!uid || l.ubicacion === uid));
 const stockDe = (aid, uid) => lotesDe(aid, uid).reduce((s, l) => s + l.restante, 0);
 function porUbicacion(aid) { const m = {}; lotesDe(aid).forEach(l => { m[l.ubicacion] = (m[l.ubicacion] || 0) + l.restante; }); return m; }
@@ -436,7 +439,7 @@ function render() {
   $('tabla').innerHTML = vis.length ? vis.map(f => `<tr><td class="mono">${esc(f.a.codigo)}</td>
     <td>${esc(f.a.nombre)}${f.a.minimo && f.stock > 0 && f.stock <= f.a.minimo ? ' <span class="etq cero">Bajo mínimo</span>' : ''}${f.stock < 0 ? ' <span class="etq neg">A revisar</span>' : ''}</td>
     <td class="num ${f.stock <= 0 ? 'cero' : ''}">${Math.max(0, f.stock)} <small>${esc(f.a.unidad)}</small></td>
-    <td class="mono" style="font-size:13px">${f.pu.filter(([, v]) => v > 0).map(([u, v]) => `${esc(ubic(u)?.codigo || 'sin ubicación')}: <b>${v}</b>`).join('<br>') || '—'}</td></tr>`).join('')
+    <td class="mono" style="font-size:13px">${f.pu.filter(([, v]) => v > 0).map(([u, v]) => `${verUbic(ubic(u))}: <b>${v}</b>`).join('<br>') || '—'}</td></tr>`).join('')
     : `<tr><td colspan="4" class="ayuda">${arts.length ? 'No hay artículos con esa búsqueda.' : 'Todavía no hay stock cargado.'}</td></tr>`;
 }
 $('buscar').addEventListener('input', render);

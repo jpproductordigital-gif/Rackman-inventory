@@ -264,7 +264,19 @@
     <section data-panel="ubicaciones" hidden>
       <h2>Ubicaciones</h2>
       <div class="caja">
-        <h3>Generar ubicaciones por coordenadas</h3>
+        <h3 id="tituloUbic">Nueva ubicación</h3>
+        <p class="ayuda">Sirve para cualquier depósito: zonas de piso, playas, muelles, jaulas o estanterías. El <b>código</b> es lo que va en la etiqueta y se escanea; el <b>nombre</b> y la <b>descripción</b> ayudan a encontrar el lugar.</p>
+        <div class="fila dos">
+          <label class="c">Código (va en la etiqueta)<span class="con-boton"><input id="ubCodigo" class="mono" maxlength="40" autocomplete="off" placeholder="Ej. Z-A3, MUELLE-2, 15"><button class="btn sec chico" type="button" data-escanear="ubCodigo">Escanear</button></span></label>
+          <label class="c">Nombre<input id="ubNombre" maxlength="60" placeholder="Ej. Zona A, playa 3"></label>
+        </div>
+        <label class="c" style="margin-bottom:8px">Descripción (cómo encontrarla)<input id="ubDesc" maxlength="160" placeholder="Ej. Al fondo a la izquierda, junto al portón 2"></label>
+        <p class="ayuda" id="infoUbicNueva"></p>
+        <div class="botones"><button class="btn acento" id="btnGuardarUbic">Crear ubicación</button><button class="btn sec" id="btnCancelarUbic" hidden>Cancelar edición</button></div>
+      </div>
+      <details class="caja">
+        <summary style="cursor:pointer;font-weight:700">Generar en serie por coordenadas (depósitos con pasillos y estanterías)</summary>
+        <div style="margin-top:10px">
         <p class="ayuda">Cada ubicación se codifica como <span class="mono">Galpón-Pasillo-Estantería-Nivel-Posición</span>, por ejemplo <span class="mono">G1-P02-E05-N3-04</span>. Indicá desde y hasta para generar varias a la vez.</p>
         <div class="fila cinco">
           <label class="c">Galpón<input id="uG" value="1"></label>
@@ -275,10 +287,11 @@
         </div>
         <div class="botones"><button class="btn" id="btnGenUbic">Generar</button></div>
         <p class="ayuda" id="infoGen"></p>
-      </div>
-      <input class="buscador" id="buscarUbic" type="search" placeholder="Buscar ubicación…">
+        </div>
+      </details>
+      <input class="buscador" id="buscarUbic" type="search" placeholder="Buscar por código, nombre o descripción…">
       <div class="botones no-imprimir" style="margin:0 0 10px"><button class="btn sec chico" id="btnEtiquetas">Imprimir etiquetas con QR</button></div>
-      <div class="caja tabla-cont"><table><thead><tr><th>Ubicación</th><th>Contenido</th><th class="num">Unidades</th></tr></thead><tbody id="tablaUbic"></tbody></table></div>
+      <div class="caja tabla-cont"><table><thead><tr><th>Ubicación</th><th>Contenido</th><th class="num">Unidades</th><th></th></tr></thead><tbody id="tablaUbic"></tbody></table></div>
     </section>
 
     <!-- ACCESOS -->
@@ -403,7 +416,10 @@ addEventListener('storage', e => { if (DEMO && e.key === CLAVE_DEMO && yo) { Dat
 const art = id => oficial('articulos')[id];
 const ubic = id => oficial('ubicaciones')[id];
 const artPorCodigo = c => lista(oficial('articulos')).find(a => mismo(a.codigo, c));
-const ubicPorCodigo = c => lista(oficial('ubicaciones')).find(u => mismo(u.codigo, c));
+const ubicPorCodigo = c => { const us = lista(oficial('ubicaciones')); return us.find(u => mismo(u.codigo, c)) || (String(c || '').trim() ? (us.filter(u => u.nombre && mismo(u.nombre, c)).length === 1 ? us.find(u => u.nombre && mismo(u.nombre, c)) : undefined) : undefined); };
+/* Cómo se muestra una ubicación: código y, si tiene, su nombre */
+const verUbic = u => u ? `${esc(u.codigo)}${u.nombre ? ` <span class="ayuda" style="font-family:var(--sans)">· ${esc(u.nombre)}</span>` : ''}` : 'sin ubicación';
+const opcionesUbic = () => ubicacionesOrdenadas().map(u => `<option value="${esc(u.codigo)}">${esc([u.nombre, u.descripcion].filter(Boolean).join(' — '))}</option>`).join('');
 const lotesDe = (aid, uid) => lista(oficial('lotes')).filter(l => l.articulo === aid && (!uid || l.ubicacion === uid));
 const stockDe = (aid, uid) => lotesDe(aid, uid).reduce((s, l) => s + l.restante, 0);
 function porUbicacion(aid) { const m = {}; lotesDe(aid).forEach(l => { m[l.ubicacion] = (m[l.ubicacion] || 0) + l.restante; }); return m; }
@@ -690,7 +706,7 @@ function irA(t) { tab = t; document.querySelectorAll('#pestanas button').forEach
 function render() {
   if (!yo) return;
   $('nPend').textContent = pendientes().length;
-  $('listaUbic').innerHTML = ubicacionesOrdenadas().map(u => `<option value="${esc(u.codigo)}">`).join('');
+  $('listaUbic').innerHTML = opcionesUbic();
   ({ bandeja: pintarBandeja, stock: pintarStock, articulos: pintarArticulos, registrar: pintarRegistrar, comprobantes: pintarComprobantes, indicadores: pintarIndicadores, conteos: pintarConteos, ubicaciones: pintarUbicaciones, accesos: pintarAccesos }[tab])();
 }
 
@@ -777,7 +793,7 @@ function pintarStock() {
   $('tablaStock').innerHTML = vis.length ? vis.map(f => { const pu = Object.entries(porUbicacion(f.a.id)).filter(([, v]) => v !== 0);
     return `<tr class="click" data-art="${f.a.id}"><td class="mono">${esc(f.a.codigo)}</td><td>${esc(f.a.nombre)}${f.a.minimo && f.stock > 0 && f.stock <= f.a.minimo ? ' <span class="etq cero">Bajo mínimo</span>' : ''}</td>
     <td class="num ${f.stock < 0 ? 'neg' : f.stock === 0 ? 'cero' : ''}">${f.stock} <small>${esc(f.a.unidad)}</small></td><td class="num">${pend[f.a.id] ? `<span class="etq pend">${signo(pend[f.a.id])}</span>` : '—'}</td>
-    <td class="mono" style="font-size:13px">${pu.map(([u, v]) => `${esc(ubic(u)?.codigo || 'sin ubicación')}: <b class="${v < 0 ? 'neg' : ''}">${v}</b>`).join('<br>') || '—'}</td>
+    <td class="mono" style="font-size:13px">${pu.map(([u, v]) => `${verUbic(ubic(u))}: <b class="${v < 0 ? 'neg' : ''}">${v}</b>`).join('<br>') || '—'}</td>
     <td><span class="etq ${f.clase}">${ETQ[f.clase]}</span></td></tr>`; }).join('') : `<tr><td colspan="6" class="ayuda">${lista(oficial('articulos')).length ? 'No hay artículos con esa búsqueda.' : 'Todavía no hay artículos.'}</td></tr>`;
 }
 $('buscarStock').addEventListener('input', pintarStock);
@@ -888,7 +904,9 @@ const EST_CONTEO = { abierto: 'Abierto', cerrado: 'Cerrado, por resolver', resue
 function pintarConteos() {
   const pref = new Set(lista(oficial('ubicaciones')).map(u => u.codigo.split('-').slice(0, 2).join('-')));
   const sel = $('conteoAlcance').value;
-  $('conteoAlcance').innerHTML = '<option value="">Todo el almacén</option>' + [...pref].sort().map(p => `<option value="${esc(p)}">Pasillo ${esc(p)}</option>`).join(''); $('conteoAlcance').value = sel;
+  const series = [...pref].filter(p => /^G[^-]+-P\d+$/.test(p)).sort();
+  $('conteoAlcance').innerHTML = '<option value="">Todo el almacén</option>' + (series.length ? `<optgroup label="Pasillos">${series.map(p => `<option value="${esc(p)}">Pasillo ${esc(p)}</option>`).join('')}</optgroup>` : '')
+    + `<optgroup label="Una ubicación">${ubicacionesOrdenadas().map(u => `<option value="${esc(u.codigo)}">${esc(u.codigo)}${u.nombre ? ' · ' + esc(u.nombre) : ''}</option>`).join('')}</optgroup>`; $('conteoAlcance').value = sel;
   if (!$('conteoFecha').value) { const d = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4); $('conteoFecha').value = d.toISOString().slice(0, 16); }
   const cs = lista(oficial('conteos')).sort((a, b) => b.creado - a.creado);
   $('tablaConteos').innerHTML = cs.length ? cs.map(c => `<tr><td class="mono">${esc(c.id.slice(-6).toUpperCase())}</td><td>${fmtF(c.programado)}</td><td class="mono">${esc(c.alcance || 'Todo')}</td>
@@ -974,21 +992,49 @@ $('btnGenUbic').addEventListener('click', async () => {
   if (!nuevas) return toast('Esas ubicaciones ya existen.');
   await Datos.escribir(cambios); $('infoGen').textContent = `Se crearon ${nuevas} ubicaciones.`; toast(`${nuevas} ubicaciones creadas`);
 });
-const ubicFiltradas = () => { const q = $('buscarUbic').value.trim().toLowerCase(); return ubicacionesOrdenadas().filter(u => !q || u.codigo.toLowerCase().includes(q)); };
+const ubicFiltradas = () => { const q = $('buscarUbic').value.trim().toLowerCase(); return ubicacionesOrdenadas().filter(u => !q || [u.codigo, u.nombre, u.descripcion].join(' ').toLowerCase().includes(q)); };
 function pintarUbicaciones() {
   const us = ubicFiltradas();
   $('tablaUbic').innerHTML = us.length ? us.slice(0, 500).map(u => { const cont = {}; lista(oficial('lotes')).filter(l => l.ubicacion === u.id).forEach(l => cont[l.articulo] = (cont[l.articulo] || 0) + l.restante);
     const items = Object.entries(cont).filter(([, v]) => v !== 0), total = items.reduce((s, [, v]) => s + v, 0);
-    return `<tr><td class="mono">${esc(u.codigo)}</td><td>${items.map(([a, v]) => `${esc(art(a)?.nombre || '?')} <b class="${v < 0 ? 'neg' : ''}">(${v})</b>`).join(', ') || '<span class="ayuda">Vacía</span>'}</td><td class="num ${total < 0 ? 'neg' : ''}">${total}</td></tr>`; }).join('')
-    : '<tr><td colspan="3" class="ayuda">Generá las ubicaciones con el formulario de arriba.</td></tr>';
+    const usada = lista(oficial('lotes')).some(l => l.ubicacion === u.id);
+    return `<tr><td class="mono">${verUbic(u)}${u.descripcion ? `<div class="ayuda" style="font-family:var(--sans);margin:2px 0 0">${esc(u.descripcion)}</div>` : ''}</td><td>${items.map(([a, v]) => `${esc(art(a)?.nombre || '?')} <b class="${v < 0 ? 'neg' : ''}">(${v})</b>`).join(', ') || '<span class="ayuda">Vacía</span>'}</td><td class="num ${total < 0 ? 'neg' : ''}">${total}</td>
+      <td style="white-space:nowrap"><button class="btn sec chico" data-editar-ubic="${u.id}">Editar</button>${usada ? '' : ` <button class="btn sec chico" data-borrar-ubic="${u.id}">Borrar</button>`}</td></tr>`; }).join('')
+    : '<tr><td colspan="4" class="ayuda">Creá la primera ubicación con el formulario de arriba.</td></tr>';
 }
 $('buscarUbic').addEventListener('input', pintarUbicaciones);
+/* Ubicaciones personalizadas: código, nombre y descripción */
+let editandoUbic = null;
+const codigoUbicValido = c => /^[A-Za-z0-9ÁÉÍÓÚÑáéíóúñ._\- ]{1,40}$/.test(c);
+function infoUbicNueva() { const c = $('ubCodigo').value.trim(), ya = c && ubicPorCodigo(c);
+  $('infoUbicNueva').innerHTML = editandoUbic ? 'Editando: el código no se cambia, porque es lo que está impreso en la etiqueta y en el historial.'
+    : ya ? `<span class="neg">Ya existe una ubicación con ese código o nombre: ${verUbic(ya)}</span>` : c && !codigoUbicValido(c) ? '<span class="neg">Usá letras, números, espacios, guiones, puntos o guion bajo (hasta 40).</span>' : ''; }
+$('ubCodigo').addEventListener('input', infoUbicNueva);
+function limpiarUbic() { editandoUbic = null; ['ubCodigo', 'ubNombre', 'ubDesc'].forEach(id => $(id).value = ''); $('ubCodigo').disabled = false;
+  $('tituloUbic').textContent = 'Nueva ubicación'; $('btnGuardarUbic').textContent = 'Crear ubicación'; $('btnCancelarUbic').hidden = true; infoUbicNueva(); }
+$('btnCancelarUbic').addEventListener('click', limpiarUbic);
+$('btnGuardarUbic').addEventListener('click', async () => {
+  const codigo = $('ubCodigo').value.trim(), nombre = $('ubNombre').value.trim(), descripcion = $('ubDesc').value.trim();
+  if (editandoUbic) { await Datos.escribir({ [`${OF}ubicaciones/${editandoUbic}/nombre`]: nombre, [`${OF}ubicaciones/${editandoUbic}/descripcion`]: descripcion }); toast('Ubicación actualizada'); limpiarUbic(); return; }
+  if (!codigo) return toast('Falta el código.'); if (!codigoUbicValido(codigo)) return toast('El código tiene caracteres no permitidos.');
+  if (ubicPorCodigo(codigo) || (nombre && ubicPorCodigo(nombre))) return toast('Ya existe una ubicación con ese código o nombre.');
+  const id = nid('U'); await Datos.escribir({ [`${OF}ubicaciones/${id}`]: { id, codigo, nombre, descripcion, tipo: 'personalizada', alta: ahora() } });
+  toast(`Ubicación ${codigo} creada`); limpiarUbic(); $('ubCodigo').focus();
+});
+document.addEventListener('click', async e => {
+  const ed = e.target.closest('[data-editar-ubic]'); if (ed) { const u = ubic(ed.dataset.editarUbic); if (!u) return; editandoUbic = u.id;
+    $('ubCodigo').value = u.codigo; $('ubCodigo').disabled = true; $('ubNombre').value = u.nombre || ''; $('ubDesc').value = u.descripcion || '';
+    $('tituloUbic').textContent = 'Editar ubicación'; $('btnGuardarUbic').textContent = 'Guardar cambios'; $('btnCancelarUbic').hidden = false; infoUbicNueva(); scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const bo = e.target.closest('[data-borrar-ubic]'); if (bo) { const u = ubic(bo.dataset.borrarUbic); if (!u) return;
+    if (lista(oficial('lotes')).some(l => l.ubicacion === u.id)) return toast('Esa ubicación tiene historial: no se puede borrar.');
+    if (!confirm(`¿Borrar la ubicación ${u.codigo}? Nunca tuvo stock.`)) return; await Datos.escribir({ [`${OF}ubicaciones/${u.id}`]: null }); toast('Ubicación borrada'); }
+});
 $('btnEtiquetas').addEventListener('click', async () => {
   const us = ubicFiltradas(); if (!us.length) return toast('No hay ubicaciones para imprimir.');
   try { await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'); } catch (e) { return toast('Se necesita conexión para generar los QR.'); }
   abrirModal(`<h2 class="no-imprimir">Etiquetas de ubicación</h2><p class="ayuda no-imprimir">${us.length} etiquetas. Usá "Imprimir" y recortalas para pegarlas en cada lugar.</p>
     <div class="botones no-imprimir" style="margin-bottom:10px"><button class="btn" onclick="print()">Imprimir</button></div>
-    <div class="etiquetas">${us.map(u => `<div class="etiqueta"><div class="qr" data-qr="${esc(u.codigo)}"></div><div class="cod">${esc(u.codigo)}</div></div>`).join('')}</div>`);
+    <div class="etiquetas">${us.map(u => `<div class="etiqueta"><div class="qr" data-qr="${esc(u.codigo)}"></div><div class="cod">${esc(u.codigo)}</div>${u.nombre ? `<div style="font-weight:700">${esc(u.nombre)}</div>` : ''}${u.descripcion ? `<div style="font-size:11px">${esc(u.descripcion)}</div>` : ''}</div>`).join('')}</div>`);
   document.querySelectorAll('[data-qr]').forEach(el => new QRCode(el, { text: el.dataset.qr, width: 110, height: 110, correctLevel: QRCode.CorrectLevel.M }));
 });
 

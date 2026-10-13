@@ -313,7 +313,10 @@ addEventListener('storage', e => { if (DEMO && e.key === CLAVE_DEMO && yo) { Dat
 const art = id => oficial('articulos')[id];
 const ubic = id => oficial('ubicaciones')[id];
 const artPorCodigo = c => lista(oficial('articulos')).find(a => mismo(a.codigo, c));
-const ubicPorCodigo = c => lista(oficial('ubicaciones')).find(u => mismo(u.codigo, c));
+const ubicPorCodigo = c => { const us = lista(oficial('ubicaciones')); return us.find(u => mismo(u.codigo, c)) || (String(c || '').trim() ? (us.filter(u => u.nombre && mismo(u.nombre, c)).length === 1 ? us.find(u => u.nombre && mismo(u.nombre, c)) : undefined) : undefined); };
+/* Cómo se muestra una ubicación: código y, si tiene, su nombre */
+const verUbic = u => u ? `${esc(u.codigo)}${u.nombre ? ` <span class="ayuda" style="font-family:var(--sans)">· ${esc(u.nombre)}</span>` : ''}` : 'sin ubicación';
+const opcionesUbic = () => ubicacionesOrdenadas().map(u => `<option value="${esc(u.codigo)}">${esc([u.nombre, u.descripcion].filter(Boolean).join(' — '))}</option>`).join('');
 const lotesDe = (aid, uid) => lista(oficial('lotes')).filter(l => l.articulo === aid && (!uid || l.ubicacion === uid));
 const stockDe = (aid, uid) => lotesDe(aid, uid).reduce((s, l) => s + l.restante, 0);
 function porUbicacion(aid) { const m = {}; lotesDe(aid).forEach(l => { m[l.ubicacion] = (m[l.ubicacion] || 0) + l.restante; }); return m; }
@@ -491,7 +494,7 @@ $('pestanas').addEventListener('click', e => { const b = e.target.closest('[data
   document.querySelectorAll('[data-panel]').forEach(s => s.hidden = s.dataset.panel !== tab); render(); scrollTo(0, 0); });
 function render() {
   if (!yo) return;
-  $('listaUbic').innerHTML = ubicacionesOrdenadas().map(u => `<option value="${esc(u.codigo)}">`).join('');
+  $('listaUbic').innerHTML = opcionesUbic();
   ({ stock: pintarStock, registrar: pintarRegistrar, conteos: pintarConteos, registros: pintarRegistros }[tab])();
 }
 
@@ -524,7 +527,7 @@ document.addEventListener('click', e => { const tr = e.target.closest('[data-cod
   const f = proyeccion().find(x => mismo(x.codigo, tr.dataset.cod)); if (!f) return;
   const pu = f.a ? Object.entries(porUbicacion(f.a.id)).filter(([, v]) => v !== 0) : [];
   abrirModal(`<h2>${esc(f.nombre || f.codigo)}</h2><p class="mono ayuda">${esc(f.codigo)} · oficial <b>${f.oficial}</b> · proyectado <b>${f.proy}</b></p>
-    <h3>Stock oficial por ubicación</h3>${pu.length ? `<table><tbody>${pu.map(([u, v]) => `<tr><td class="mono">${esc(ubic(u)?.codigo || 'sin ubicación')}</td><td class="num ${v < 0 ? 'neg' : ''}">${v}</td></tr>`).join('')}</tbody></table>` : '<p class="ayuda">Sin stock oficial.</p>'}
+    <h3>Stock oficial por ubicación</h3>${pu.length ? `<table><tbody>${pu.map(([u, v]) => `<tr><td class="mono">${verUbic(ubic(u))}</td><td class="num ${v < 0 ? 'neg' : ''}">${v}</td></tr>`).join('')}</tbody></table>` : '<p class="ayuda">Sin stock oficial.</p>'}
     <h3 style="margin-top:14px">Pendiente de aprobación</h3>${f.props.length ? `<ul class="linea-tiempo">${f.props.map(p => `<li>${fmtF(p.fecha)} · ${resumenProp(p)} · ${esc(p.nombreUsuario)}</li>`).join('')}</ul>` : '<p class="ayuda">Nada pendiente.</p>'}
     ${f.a ? `<div class="botones"><button class="btn sec" onclick="verArticulo('${f.a.id}')">Ver trazabilidad por lote</button></div>` : ''}`);
 });

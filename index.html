@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1F2328">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --fondo: #EEF0F2; --panel: #FFFFFF; --linea: #D7DBE0; --texto: #1F2328; --texto-2: #59626D; --acento: #F2B705; --acento-txt: #1F2328;
+    --ok: #2E7D4F; --mal: #C2362B; --aviso: #B26A00; --info: #2F5E8C; --chip: #F4F5F7;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --fondo: #15181C; --panel: #1E2227; --linea: #333941; --texto: #E8EAED; --texto-2: #A2AAB4; --chip: #262B31; } }
+  :root[data-theme="dark"] { --fondo: #15181C; --panel: #1E2227; --linea: #333941; --texto: #E8EAED; --texto-2: #A2AAB4; --chip: #262B31; }
+  :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--fondo); color: var(--texto); font-size: 15px; line-height: 1.45; }
+  button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+  button { cursor: pointer; }
+  [hidden] { display: none !important; }
+  .mono { font-family: var(--mono); }
+
+  header.barra { position: sticky; top: 0; z-index: 20; background: #1F2328; color: #F4F5F7; border-bottom: 4px solid var(--acento); }
+  .barra .cont { display: flex; align-items: center; gap: 10px; min-height: 54px; flex-wrap: wrap; }
+  .barra h1 { font-size: 18px; font-weight: 700; letter-spacing: .02em; margin-right: auto; }
+  .barra h1 span { color: var(--acento); }
+  .quien { font-size: 13px; color: #BFC5CC; }
+  .quien b { color: #F4F5F7; }
+  .rol { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: #39404A; color: #F4F5F7; margin-left: 4px; }
+  .rol.admin { background: var(--acento); color: #1F2328; }
+  .cont { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+  nav.pestanas { display: flex; gap: 2px; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--linea); position: sticky; top: 58px; z-index: 15; }
+  nav.pestanas button { flex: none; border: 0; background: transparent; padding: 12px 14px; font-weight: 600; font-size: 14px; color: var(--texto-2); border-bottom: 3px solid transparent; }
+  nav.pestanas button.activa { color: var(--texto); border-bottom-color: var(--acento); }
+  main { padding: 18px 0 60px; }
+  h2 { font-size: 20px; margin-bottom: 12px; }
+  h3 { font-size: 16px; margin-bottom: 8px; }
+  .caja { background: var(--panel); border: 1px solid var(--linea); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  .grid2 { display: grid; gap: 14px; } @media (min-width: 860px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+  .fila { display: grid; gap: 10px; margin-bottom: 10px; } @media (min-width: 560px) { .fila.dos { grid-template-columns: 1fr 1fr; } .fila.tres { grid-template-columns: 1fr 1fr 1fr; } .fila.cinco { grid-template-columns: repeat(5, 1fr); } }
+  label.c { display: block; font-size: 12.5px; font-weight: 600; color: var(--texto-2); }
+  label.c input, label.c select, label.c textarea { display: block; width: 100%; margin-top: 4px; border: 1.5px solid var(--linea); border-radius: 8px; padding: 9px 10px; background: var(--panel); font-weight: 400; color: var(--texto); }
+  label.c textarea { min-height: 60px; resize: vertical; }
+  .con-boton { display: flex; gap: 6px; margin-top: 4px; } .con-boton input { margin-top: 0 !important; flex: 1; }
+  .btn { border: 0; background: #1F2328; color: #F4F5F7; border-radius: 8px; padding: 10px 14px; font-weight: 700; font-size: 14px; white-space: nowrap; }
+  :root[data-theme="dark"] .btn, .btn { } .btn.acento { background: var(--acento); color: var(--acento-txt); }
+  .btn.sec { background: transparent; color: var(--texto); border: 1.5px solid var(--linea); }
+  .btn.peligro { background: var(--mal); color: #fff; }
+  .btn.chico { padding: 6px 10px; font-size: 13px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .botones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .segmento { display: inline-flex; border: 1.5px solid var(--linea); border-radius: 8px; overflow: hidden; margin-bottom: 12px; flex-wrap: wrap; }
+  .segmento button { border: 0; background: var(--panel); padding: 9px 14px; font-weight: 600; font-size: 14px; color: var(--texto-2); }
+  .segmento button.activo { background: #1F2328; color: #F4F5F7; }
+  .ayuda { font-size: 13px; color: var(--texto-2); margin: 4px 0 8px; }
+  .aviso { border-left: 4px solid var(--acento); background: var(--chip); padding: 10px 12px; border-radius: 6px; font-size: 13.5px; margin-bottom: 12px; }
+  .aviso.mal { border-left-color: var(--mal); } .aviso.ok { border-left-color: var(--ok); }
+  .buscador { width: 100%; border: 1.5px solid var(--linea); border-radius: 8px; padding: 10px 12px; background: var(--panel); margin-bottom: 12px; }
+  .tabla-cont { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--texto-2); padding: 8px; border-bottom: 2px solid var(--linea); white-space: nowrap; }
+  td { padding: 9px 8px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  tr.click { cursor: pointer; } tr.click:hover td { background: var(--chip); }
+  .num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .neg { color: var(--mal); font-weight: 700; } .cero { color: var(--aviso); font-weight: 700; }
+  .etq { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: var(--chip); color: var(--texto-2); white-space: nowrap; }
+  .etq.alta { background: #DDF0E4; color: var(--ok); } .etq.inmovil { background: #F6E3C9; color: var(--aviso); } .etq.media { background: #DFE8F2; color: var(--info); }
+  .etq.cero { background: #F6E3C9; color: var(--aviso); } .etq.neg { background: #F7DAD7; color: var(--mal); } .etq.anulado { background: #F7DAD7; color: var(--mal); }
+  .etq.in { background: #DDF0E4; color: var(--ok); } .etq.out { background: #DFE8F2; color: var(--info); } .etq.aj { background: #FFF1C2; color: #6B5300; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: var(--panel); border: 1px solid var(--linea); border-radius: 10px; padding: 12px 14px; cursor: pointer; text-align: left; }
+  .kpi span { font-size: 12.5px; color: var(--texto-2); font-weight: 600; } .kpi b { display: block; font-size: 28px; font-family: var(--mono); }
+  .kpi.activo { outline: 3px solid var(--acento); }
+  .linea-tiempo { list-style: none; border-left: 3px solid var(--linea); margin-left: 6px; padding-left: 14px; }
+  .linea-tiempo li { position: relative; padding: 4px 0 10px; font-size: 14px; }
+  .linea-tiempo li::before { content: ""; position: absolute; left: -21px; top: 9px; width: 11px; height: 11px; border-radius: 50%; background: var(--acento); border: 2px solid var(--panel); }
+  .modal { position: fixed; inset: 0; z-index: 40; background: rgba(15,17,20,.6); display: flex; align-items: flex-start; justify-content: center; padding: 30px 12px; overflow-y: auto; }
+  .modal .hoja { background: var(--panel); border-radius: 12px; width: 100%; max-width: 640px; padding: 18px; position: relative; }
+  .cerrar { position: absolute; right: 12px; top: 10px; border: 0; background: var(--chip); width: 34px; height: 34px; border-radius: 50%; font-size: 18px; }
+  .comprobante { border: 2px dashed var(--linea); border-radius: 10px; padding: 14px; font-size: 14px; }
+  .comprobante .cab { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--linea); padding-bottom: 8px; margin-bottom: 8px; }
+  .comprobante .nro { font-family: var(--mono); font-size: 18px; font-weight: 600; }
+  video#video { width: 100%; border-radius: 10px; background: #000; max-height: 50vh; object-fit: cover; }
+  .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(8px); background: #1F2328; color: #F4F5F7; border-left: 4px solid var(--acento);
+    padding: 11px 16px; border-radius: 8px; font-size: 14px; opacity: 0; pointer-events: none; transition: .2s; z-index: 60; max-width: 92vw; }
+  .toast.visible { opacity: 1; transform: translateX(-50%); }
+  .ingreso { max-width: 420px; margin: 60px auto; text-align: center; }
+  .ingreso p { color: var(--texto-2); margin: 8px 0 16px; }
+  .codigo-grande { font-family: var(--mono); font-size: 34px; letter-spacing: .2em; font-weight: 600; text-align: center; padding: 12px; background: var(--chip); border-radius: 10px; margin: 8px 0; }
+  .etiquetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+  .etiqueta { border: 1.5px solid var(--texto); border-radius: 6px; padding: 8px; text-align: center; break-inside: avoid; }
+  .etiqueta .qr { display: flex; justify-content: center; margin: 4px 0; }
+  .etiqueta .cod { font-family: var(--mono); font-weight: 600; font-size: 15px; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--acento); outline-offset: 1px; }
+  @media print { header.barra, nav.pestanas, .no-imprimir, .toast { display: none !important; } body { background: #fff; color: #000; } .caja { border: 0; } }
+  .etq.pend { background: #FFF1C2; color: #6B5300; } .etq.rech { background: #F7DAD7; color: var(--mal); }
+  .fotos { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+  .fotos img { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid var(--linea); cursor: zoom-in; }
+  .foto-x { position: relative; } .foto-x button { position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--mal); color: #fff; font-weight: 700; }
+  .marca { width: 18px; height: 18px; accent-color: var(--acento); }
+  .tarjeta-prop { border: 1px solid var(--linea); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--panel); }
+  .tarjeta-prop .cab { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .tarjeta-prop .cab .der { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .alerta { color: var(--mal); font-size: 13px; font-weight: 600; }
+  .pie { text-align: center; font-size: 12px; color: var(--texto-2); padding: 20px 0; }
+  .pie a { color: inherit; }
+  @media (max-width: 480px) { th, td { padding-left: 5px; padding-right: 5px; } th { font-size: 11px; letter-spacing: 0; } }
+
+</style>
+
+<title>Stock disponible</title>
+</head>
+<body>
+<header class="barra"><div class="cont">
+  <h1>STOCK<span>.</span></h1>
+  <span class="quien" id="quien"></span>
+  <button class="btn sec chico" id="salir" hidden style="color:#F4F5F7;border-color:#4A515B">Salir</button>
+</div></header>
+
+<section class="cont ingreso" id="pantallaIngreso" hidden>
+  <h2 id="tituloIngreso">Ingresá</h2>
+  <p id="ayudaIngreso">Usá tu cuenta de Google. El administrador tiene que haber habilitado tu correo.</p>
+  <button class="btn acento" id="btnGoogle">Ingresar con Google</button>
+  <div id="demoUsuarios" hidden style="margin-top:20px">
+    <div class="botones" id="demoBotones" style="justify-content:center"></div>
+  </div>
+</section>
+
+
+<div id="app" hidden>
+  <main class="cont">
+    <h2>Stock disponible</h2>
+    <p class="ayuda">Solo lectura. Muestra el stock oficial, el que ya aprobó el administrador. Se actualiza solo.</p>
+    <div class="con-boton" style="margin-bottom:12px">
+      <input class="buscador" id="buscar" type="search" placeholder="Buscar por nombre, código o ubicación…" style="margin:0">
+      <button class="btn sec" data-escanear="buscar">Escanear</button>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="caja tabla-cont"><table><thead><tr><th>Código</th><th>Artículo</th><th class="num">Disponible</th><th>Dónde está</th></tr></thead><tbody id="tabla"></tbody></table></div>
+    <p class="pie"><a href="almacen.html">Herramientas del almacén →</a></p>
+  </main>
+</div>
+
+<div class="modal" id="modal" hidden><div class="hoja"><button class="cerrar no-imprimir" data-cerrar aria-label="Cerrar">×</button><div id="modalCuerpo"></div></div></div>
+<div class="modal" id="modalScan" hidden><div class="hoja"><button class="cerrar" id="cerrarScan" aria-label="Cerrar">×</button><h3>Escanear código</h3><video id="video" playsinline muted></video><p class="ayuda" id="ayudaScan">Apuntá la cámara al código de barras o QR.</p><div id="lectorFallback"></div></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+/* =========================================================
+   CONFIGURACIÓN (la misma en las tres páginas)
+   ========================================================= */
+const FIREBASE_CONFIG = {"apiKey": "AIzaSyA9KMmebgWfaTFKkjMCCMs3pB-_l3SSL60", "authDomain": "rackman-database.firebaseapp.com", "databaseURL": "https://rackman-database-default-rtdb.firebaseio.com", "projectId": "rackman-database", "storageBucket": "rackman-database.firebasestorage.app", "messagingSenderId": "407519324836", "appId": "1:407519324836:web:f395923234f6211c589431"};
+const CORREO_ADMIN = 'jpproductordigital@gmail.com';   // correo del administrador
+const PAGINA = 'consulta';
+
+/* =========================================================
+   UTILIDADES
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ahora = () => Date.now();
+const nid = p => p + ahora().toString(36) + Math.random().toString(36).slice(2, 6);
+const claveCorreo = e => String(e || '').trim().toLowerCase().replace(/\./g, ',');
+const fmtF = t => t ? new Date(t).toLocaleString('es-UY', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+const fmtD = t => t ? new Date(t).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+const nro = n => String(n).padStart(6, '0');
+const lista = o => Object.values(o || {});
+const mismo = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+const signo = n => (n > 0 ? '+' : '') + n;
+function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('visible'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('visible'), 2800); }
+const TIPOS = { nuevo: 'Ingreso nuevo', reposicion: 'Reposición', devolucion: 'Devolución', egreso: 'Egreso', ajuste: 'Ajuste', anulacion: 'Anulación' };
+const CLASE_TIPO = { nuevo: 'in', reposicion: 'in', devolucion: 'in', egreso: 'out', ajuste: 'aj', anulacion: 'anulado' };
+const TIPOS_PROP = { entrada: 'Entrada', salida: 'Salida', ajuste: 'Solicitud de ajuste' };
+const cargarScript = src => new Promise((ok, mal) => { if ([...document.scripts].some(s => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = mal; document.head.appendChild(s); });
+
+/* =========================================================
+   DATOS
+   R es un espejo de la base:
+     inv/oficial      → lo único que cuenta como stock (solo lo escribe el administrador)
+     inv/propuestas   → lo que registran los funcionarios (pendiente hasta que el administrador lo revisa)
+     inv/lecturas     → lo que se cuenta en cada tarea de conteo
+     inv/autorizados  → funcionarios habilitados
+     inv_codigos      → códigos temporales para pedir ajustes
+     inv_fotos        → fotos comprimidas de cada propuesta
+   ========================================================= */
+let R = { inv: {}, inv_codigos: {}, inv_fotos: {} };
+let yo = null; // { email, nombre, admin }
+const DEMO = !FIREBASE_CONFIG;
+const CLAVE_DEMO = 'inventario2-demo';
+const OF = 'inv/oficial/';
+const TS = () => DEMO ? ahora() : firebase.database.ServerValue.TIMESTAMP;
+const oficial = k => (R.inv.oficial || {})[k] || {};
+const propuestas = () => R.inv.propuestas || {};
+const revision = pid => oficial('revisiones')[pid];
+const pendientes = () => lista(propuestas()).filter(p => !revision(p.id)).sort((a, b) => a.fecha - b.fecha);
+
+function ponerEn(obj, ruta, val) {
+  const partes = ruta.split('/'); let o = obj;
+  for (let i = 0; i < partes.length - 1; i++) { if (typeof o[partes[i]] !== 'object' || o[partes[i]] === null) o[partes[i]] = {}; o = o[partes[i]]; }
+  if (val === null || val === undefined) delete o[partes.at(-1)]; else o[partes.at(-1)] = val;
+}
+const Datos = {
+  raiz: null,
+  leerDemo() { try { const d = JSON.parse(localStorage.getItem(CLAVE_DEMO)); R = { inv: {}, inv_codigos: {}, inv_fotos: {}, ...(d || {}) }; } catch (e) {} },
+  guardarDemo() { try { localStorage.setItem(CLAVE_DEMO, JSON.stringify(R)); } catch (e) { toast('El navegador no deja guardar más datos de prueba.'); } },
+  /* cambios: { 'ruta/completa/desde/la/raiz': valor | null } — se escriben todos juntos o ninguno */
+  async escribir(cambios) {
+    if (DEMO) { Object.entries(cambios).forEach(([k, v]) => ponerEn(R, k, v)); this.guardarDemo(); render(); return; }
+    await this.raiz.update(cambios);
+    // Las ramas que esta página no escucha en vivo se reflejan a mano
+    const fuera = Object.entries(cambios).filter(([k]) => !Datos.escuchadas.some(e => k === e || k.startsWith(e + '/')));
+    if (fuera.length) { fuera.forEach(([k, v]) => ponerEn(R, k, typeof v === 'object' && v && v['.sv'] ? ahora() : v)); render(); }
+  },
+  escuchadas: [],
+  async siguienteNumero() {
+    if (DEMO) { R.inv.oficial = R.inv.oficial || {}; R.inv.oficial.contador = (R.inv.oficial.contador || 0) + 1; this.guardarDemo(); return R.inv.oficial.contador; }
+    const r = await this.raiz.child(OF + 'contador').transaction(v => (v || 0) + 1); return r.snapshot.val();
+  },
+  async fotos(pid) {
+    if (DEMO) return lista(R.inv_fotos[pid]);
+    const s = await this.raiz.child('inv_fotos/' + pid).once('value'); return lista(s.val());
+  },
+  async codigo(c) {
+    if (DEMO) return R.inv_codigos[c] || null;
+    try { const s = await this.raiz.child('inv_codigos/' + c).once('value'); return s.val(); } catch (e) { return null; }
+  }
+};
+addEventListener('storage', e => { if (DEMO && e.key === CLAVE_DEMO && yo) { Datos.leerDemo(); render(); } });
+
+/* =========================================================
+   STOCK OFICIAL
+   ========================================================= */
+const art = id => oficial('articulos')[id];
+const ubic = id => oficial('ubicaciones')[id];
+const artPorCodigo = c => lista(oficial('articulos')).find(a => mismo(a.codigo, c));
+const ubicPorCodigo = c => lista(oficial('ubicaciones')).find(u => mismo(u.codigo, c));
+const lotesDe = (aid, uid) => lista(oficial('lotes')).filter(l => l.articulo === aid && (!uid || l.ubicacion === uid));
+const stockDe = (aid, uid) => lotesDe(aid, uid).reduce((s, l) => s + l.restante, 0);
+function porUbicacion(aid) { const m = {}; lotesDe(aid).forEach(l => { m[l.ubicacion] = (m[l.ubicacion] || 0) + l.restante; }); return m; }
+const compsVigentes = () => lista(oficial('comprobantes')).filter(c => !c.anulado && c.tipo !== 'anulacion');
+const ubicacionesOrdenadas = () => lista(oficial('ubicaciones')).sort((a, b) => a.codigo.localeCompare(b.codigo));
+
+function analisisFlujo(dias = 30, diasInmovil = 60) {
+  const desde = ahora() - dias * 864e5, inmovil = diasInmovil * 864e5, salidas = {}, ultimo = {};
+  compsVigentes().filter(c => c.tipo === 'egreso').forEach(c => { if (c.fecha >= desde) salidas[c.articulo] = (salidas[c.articulo] || 0) + c.cantidad; ultimo[c.articulo] = Math.max(ultimo[c.articulo] || 0, c.fecha); });
+  const filas = lista(oficial('articulos')).map(a => ({ a, stock: stockDe(a.id), salidas: salidas[a.id] || 0, ultimo: ultimo[a.id] || 0 }));
+  const conMov = filas.filter(f => f.salidas > 0).sort((x, y) => y.salidas - x.salidas), corte = Math.max(1, Math.ceil(conMov.length / 3));
+  const alta = new Set(conMov.slice(0, corte).map(f => f.a.id));
+  filas.forEach(f => { f.clase = f.stock < 0 ? 'neg' : f.stock === 0 ? 'cero' : alta.has(f.a.id) ? 'alta' : (ahora() - Math.max(f.ultimo, f.a.alta || 0) > inmovil) ? 'inmovil' : 'media'; });
+  return filas;
+}
+const ETQ = { alta: 'Alta rotación', media: 'Rotación media', inmovil: 'Sin movimiento', cero: 'Stock en 0', neg: 'Negativo' };
+
+/* =========================================================
+   VISTAS COMPARTIDAS: comprobante y trazabilidad por lote
+   ========================================================= */
+function abrirModal(html) { $('modalCuerpo').innerHTML = html; $('modal').hidden = false; }
+function cerrarModal() { $('modal').hidden = true; }
+$('modal').addEventListener('click', e => { if (e.target === $('modal') || e.target.closest('[data-cerrar]')) cerrarModal(); });
+addEventListener('keydown', e => { if (e.key === 'Escape') { cerrarModal(); cerrarScan(); } });
+
+function detalleComp(c) {
+  const a = art(c.articulo), u = ubic(c.ubicacion);
+  if (c.tipo === 'anulacion') return `Anula el N.º ${nro(c.anulaNumero)}`;
+  const cant = c.tipo === 'ajuste' ? `${c.antes} → ${c.despues} (${signo(c.cantidad)})` : `${c.cantidad} u`;
+  return `${esc(a?.nombre || '?')} · ${cant}${u ? ` · <span class="mono">${esc(u.codigo)}</span>` : ''}`;
+}
+function verComprobante(cid) {
+  const c = oficial('comprobantes')[cid]; if (!c) return; const a = art(c.articulo), u = ubic(c.ubicacion);
+  const filasItems = (c.items || []).map(i => `<tr><td class="mono">${esc(i.lote.slice(-6).toUpperCase())}</td><td class="mono">${esc(ubic(i.ubicacion)?.codigo || '—')}</td><td class="num">${i.cantidad}</td><td>${i.negativo ? '<span class="etq neg">Faltante</span>' : i.cubreNegativo ? 'Cubre faltante' : i.loteNuevo ? 'Lote nuevo' : 'Descuento'}</td></tr>`).join('');
+  abrirModal(`<div class="comprobante"><div class="cab"><div><div class="ayuda" style="margin:0">Comprobante</div><div class="nro">N.º ${nro(c.numero)}</div></div>
+    <div style="text-align:right"><span class="etq ${CLASE_TIPO[c.tipo]}">${TIPOS[c.tipo]}</span>${c.anulado ? ' <span class="etq anulado">Anulado</span>' : ''}<div class="ayuda" style="margin:4px 0 0">${fmtF(c.fecha)}</div></div></div>
+    ${c.tipo === 'anulacion' ? `<p>Anula el comprobante <a href="#" data-comp="${c.anula}" class="mono">N.º ${nro(c.anulaNumero)}</a>.</p>` : `
+    <p><b>${esc(a?.nombre || '?')}</b> <span class="mono ayuda">${esc(a?.codigo || '')}</span></p>
+    <p>${c.tipo === 'ajuste' ? `Stock registrado ${c.antes} → real ${c.despues} (diferencia ${signo(c.cantidad)})` : `Cantidad: <b>${c.cantidad}</b> ${esc(a?.unidad || '')}`}${u ? ` · Ubicación <span class="mono">${esc(u.codigo)}</span>` : ''}</p>`}
+    ${c.ref ? `<p>Comprobante de origen: <span class="mono">${esc(c.ref)}</span></p>` : ''}${c.nota ? `<p>Nota: ${esc(c.nota)}</p>` : ''}
+    ${c.propuestoPor ? `<p>Registrado en el almacén por ${esc(c.nombrePropuso || c.propuestoPor)} el ${fmtF(c.fechaPropuesta)}${c.corregido ? ' · <b>corregido por el administrador al aprobar</b>' : ''}</p>` : ''}
+    ${c.codigo ? `<p>Pedido con el código temporal <span class="mono">${esc(c.codigo)}</span></p>` : ''}
+    ${c.conteo ? `<p>Surge del conteo <span class="mono">${esc(c.conteo.slice(-6).toUpperCase())}</span></p>` : ''}
+    ${filasItems ? `<div class="tabla-cont" style="margin-top:8px"><table><thead><tr><th>Lote</th><th>Ubicación</th><th class="num">Cant.</th><th>Movimiento</th></tr></thead><tbody>${filasItems}</tbody></table></div>` : ''}
+    <p class="ayuda" style="margin-top:10px">${c.propuestoPor ? 'Aprobado' : 'Registrado'} por ${esc(c.nombreUsuario || '')} (${esc(c.usuario)})${c.anulado ? ` · anulado por ${esc(c.anuladoPor)} el ${fmtF(c.anuladoFecha)} con el N.º ${nro(c.anuladoCon)}` : ''}</p></div>
+    <div class="botones no-imprimir"><button class="btn sec" onclick="print()">Imprimir</button>
+    ${c.propuesta ? `<button class="btn sec" data-prop="${esc(c.propuesta)}">Ver lo registrado en el almacén</button>` : ''}
+    ${yo?.admin && PAGINA === 'admin' && !c.anulado && c.tipo !== 'anulacion' ? `<button class="btn peligro" data-anular="${c.id}">Deshacer (anular)</button>` : ''}</div>`);
+}
+function verArticulo(aid) {
+  const a = art(aid), comps = lista(oficial('comprobantes')).sort((x, y) => x.fecha - y.fecha);
+  const lotes = lotesDe(aid).sort((x, y) => x.fecha - y.fecha);
+  const movsDe = lid => comps.filter(c => (c.items || []).some(i => i.lote === lid));
+  abrirModal(`<h2>${esc(a.nombre)}</h2><p class="mono ayuda">${esc(a.codigo)} · ${esc(a.unidad)} · stock total <b>${stockDe(aid)}</b></p>
+    ${lotes.length ? lotes.map(l => `<div class="caja"><h3 class="mono">Lote ${esc(l.id.slice(-6).toUpperCase())} ${l.negativo ? '<span class="etq neg">Faltante sin ingreso</span>' : ''}</h3>
+      <p class="ayuda">Ubicación <span class="mono">${esc(ubic(l.ubicacion)?.codigo || '—')}</span> · quedan <b class="${l.restante < 0 ? 'neg' : ''}">${l.restante}</b></p>
+      <ul class="linea-tiempo">${movsDe(l.id).map(c => { const i = c.items.find(x => x.lote === l.id);
+        return `<li>${fmtF(c.fecha)} · <a href="#" data-comp="${c.id}" class="mono">N.º ${nro(c.numero)}</a> · ${TIPOS[c.tipo]} ${c.anulado ? '<span class="etq anulado">Anulado</span>' : ''} · ${i.cantidad} u · ${esc(c.nombrePropuso || c.nombreUsuario || c.usuario)}</li>`; }).join('')}</ul></div>`).join('') : '<p class="ayuda">Sin lotes registrados.</p>'}`);
+}
+document.addEventListener('click', e => { const a = e.target.closest('[data-comp]'); if (!a) return; e.preventDefault(); verComprobante(a.dataset.comp); });
+
+/* Propuesta: cómo se ve y en qué estado está */
+function estadoProp(p) {
+  const r = revision(p.id);
+  if (!r) return { clase: 'pend', texto: 'Pendiente' };
+  if (r.estado === 'rechazada') return { clase: 'rech', texto: 'Rechazada' };
+  const c = r.comprobante && oficial('comprobantes')[r.comprobante];
+  if (c?.anulado) return { clase: 'anulado', texto: 'Aprobada y luego anulada' };
+  return { clase: 'in', texto: r.comprobante ? 'Aprobada' : 'Cerrada sin cambios' };
+}
+function resumenProp(p) {
+  if (p.tipo === 'entrada') return `${TIPOS[p.subtipo] || 'Entrada'} · <span class="mono">${esc(p.codigo)}</span> ${esc(p.nombre || artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u → <span class="mono">${esc(p.ubicacion)}</span>`;
+  if (p.tipo === 'salida') return `Salida · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u${p.ubicacion ? ` desde <span class="mono">${esc(p.ubicacion)}</span>` : ''}`;
+  return `Ajuste · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} en <span class="mono">${esc(p.ubicacion)}</span>: hay ${p.cantidadReal} en realidad`;
+}
+async function htmlFotos(p) {
+  if (!p.fotos) return '';
+  try { const fs = await Datos.fotos(p.id); return `<div class="fotos">${fs.map(f => `<img src="${esc(f)}" alt="Foto adjunta" data-ampliar>`).join('')}</div>`; }
+  catch (e) { return '<p class="ayuda">No se pudieron cargar las fotos.</p>'; }
+}
+document.addEventListener('click', e => { const i = e.target.closest('[data-ampliar]'); if (!i) return; const w = open(); if (w) w.document.write(`<img src="${i.src}" style="max-width:100%">`); });
+
+/* =========================================================
+   ESCÁNER: cámara del celular (lector nativo o alternativo)
+   ========================================================= */
+let streamScan = null, destinoScan = null, bucleScan = null, lectorH5 = null;
+async function abrirScan(destino) {
+  destinoScan = destino; $('modalScan').hidden = false; $('ayudaScan').textContent = 'Apuntá la cámara al código de barras o QR.';
+  const alLeer = valor => { $(destinoScan).value = valor; $(destinoScan).dispatchEvent(new Event('input')); cerrarScan(); toast(`Leído: ${valor}`); };
+  if ('BarcodeDetector' in window) {
+    try {
+      const det = new BarcodeDetector(); streamScan = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const v = $('video'); v.hidden = false; v.srcObject = streamScan; await v.play();
+      const ciclo = async () => { if (!streamScan) return; try { const r = await det.detect(v); if (r.length) return alLeer(r[0].rawValue); } catch (e) {} bucleScan = requestAnimationFrame(ciclo); };
+      ciclo(); return;
+    } catch (e) { /* sigue con el lector alternativo */ }
+  }
+  $('video').hidden = true;
+  try {
+    await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js');
+    $('lectorFallback').innerHTML = '<div id="lectorH5"></div>';
+    lectorH5 = new Html5Qrcode('lectorH5');
+    await lectorH5.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 250, height: 160 } }, txt => alLeer(txt));
+  } catch (e) { $('ayudaScan').textContent = 'No se pudo usar la cámara. Revisá los permisos del navegador o escribí el código a mano.'; }
+}
+function cerrarScan() {
+  $('modalScan').hidden = true; cancelAnimationFrame(bucleScan);
+  if (streamScan) { streamScan.getTracks().forEach(t => t.stop()); streamScan = null; }
+  if (lectorH5) { lectorH5.stop().catch(() => {}); lectorH5 = null; $('lectorFallback').innerHTML = ''; }
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-escanear]'); if (b) { e.preventDefault(); abrirScan(b.dataset.escanear); } });
+$('cerrarScan').addEventListener('click', cerrarScan);
+
+/* =========================================================
+   SESIÓN
+   opciones: { soloAdmin, escuchar: ['inv/oficial' | 'inv'], usuariosDemo: [{ etiqueta, usuario }] }
+   ========================================================= */
+function entrar(usuario) {
+  yo = usuario; $('pantallaIngreso').hidden = true; $('app').hidden = false; $('salir').hidden = false;
+  $('quien').innerHTML = `<b>${esc(yo.nombre)}</b><span class="rol ${yo.admin ? 'admin' : ''}">${yo.admin ? 'ADMIN' : 'FUNCIONARIO'}</span>`;
+  render();
+}
+function mostrarIngreso(texto) { yo = null; $('app').hidden = true; $('pantallaIngreso').hidden = false; $('salir').hidden = true; $('quien').textContent = ''; if (texto) $('ayudaIngreso').textContent = texto; }
+async function iniciarSesion({ soloAdmin, escuchar, usuariosDemo }) {
+  if (DEMO) {
+    Datos.leerDemo(); mostrarIngreso('Modo de prueba: no hay Firebase configurado. Los datos quedan solo en este navegador y se comparten entre las tres páginas.');
+    $('btnGoogle').hidden = true; $('demoUsuarios').hidden = false;
+    $('demoBotones').innerHTML = usuariosDemo.map((u, i) => `<button class="btn ${i ? 'sec' : ''}" data-demo="${i}">${esc(u.etiqueta)}</button>`).join('');
+    $('demoBotones').onclick = e => { const b = e.target.closest('[data-demo]'); if (b) entrar(usuariosDemo[+b.dataset.demo].usuario); };
+    $('salir').onclick = () => mostrarIngreso();
+    return;
+  }
+  const base = 'https://www.gstatic.com/firebasejs/10.12.2/';
+  try { await cargarScript(base + 'firebase-app-compat.js'); await cargarScript(base + 'firebase-auth-compat.js'); await cargarScript(base + 'firebase-database-compat.js'); }
+  catch (e) { mostrarIngreso('No se pudo conectar. Revisá la conexión.'); return; }
+  firebase.initializeApp(FIREBASE_CONFIG); Datos.raiz = firebase.database().ref();
+  const prov = new firebase.auth.GoogleAuthProvider(); prov.setCustomParameters({ prompt: 'select_account' });
+  $('btnGoogle').onclick = () => firebase.auth().signInWithPopup(prov).catch(err => { if (err.code === 'auth/popup-blocked') firebase.auth().signInWithRedirect(prov); else $('ayudaIngreso').textContent = 'No se pudo ingresar (' + err.code + ').'; });
+  $('salir').onclick = () => firebase.auth().signOut();
+  let refs = [];
+  firebase.auth().onAuthStateChanged(async u => {
+    refs.forEach(r => r.off()); refs = []; R = { inv: {}, inv_codigos: {}, inv_fotos: {} };
+    if (!u) { mostrarIngreso(); return; }
+    const email = (u.email || '').toLowerCase(), admin = email === CORREO_ADMIN.toLowerCase();
+    if (soloAdmin && !admin) { await firebase.auth().signOut(); mostrarIngreso(`Este panel es solo para el administrador. La cuenta ${email} no tiene acceso.`); return; }
+    if (!admin) {
+      try { const s = await firebase.database().ref(`inv/autorizados/${claveCorreo(email)}`).once('value'); if (!s.val() || !s.val().activo) throw 0; }
+      catch (e) { await firebase.auth().signOut(); mostrarIngreso(`La cuenta ${email} no está habilitada. Pedile al administrador que la habilite.`); return; }
+    }
+    const rutas = [...escuchar, ...(admin && soloAdmin ? ['inv_codigos'] : [])]; Datos.escuchadas = rutas;
+    rutas.forEach(ruta => { const r = Datos.raiz.child(ruta); refs.push(r);
+      r.on('value', s => { ponerEn(R, ruta, s.val() || {}); if (yo) render(); }, () => toast('Sin permiso para leer los datos: revisá las reglas.')); });
+    entrar({ email, nombre: u.displayName || email, admin });
+  });
+}
+
+
+/* =========================================================
+   CONSULTA DE STOCK (solo lee inv/oficial)
+   ========================================================= */
+let filtro = '';
+function render() {
+  if (!yo) return;
+  const arts = lista(oficial('articulos'));
+  const filas = arts.map(a => ({ a, stock: stockDe(a.id), pu: Object.entries(porUbicacion(a.id)).filter(([, v]) => v !== 0) }));
+  const cuenta = f => filas.filter(f).length;
+  const K = [['', 'Artículos', cuenta(() => true)], ['disp', 'Con stock', cuenta(f => f.stock > 0)], ['bajo', 'Bajo mínimo', cuenta(f => f.a.minimo && f.stock > 0 && f.stock <= f.a.minimo)], ['cero', 'Sin stock', cuenta(f => f.stock <= 0)]];
+  $('kpis').innerHTML = K.map(([k, t, n]) => `<button class="kpi${k === filtro ? ' activo' : ''}" data-filtro="${k}"><span>${t}</span><b>${n}</b></button>`).join('');
+  const q = $('buscar').value.trim().toLowerCase();
+  const vis = filas.filter(f => (!filtro || (filtro === 'disp' ? f.stock > 0 : filtro === 'bajo' ? f.a.minimo && f.stock > 0 && f.stock <= f.a.minimo : f.stock <= 0))
+    && (!q || [f.a.codigo, f.a.nombre, ...f.pu.map(([u]) => ubic(u)?.codigo || '')].join(' ').toLowerCase().includes(q)))
+    .sort((x, y) => x.a.nombre.localeCompare(y.a.nombre));
+  $('tabla').innerHTML = vis.length ? vis.map(f => `<tr><td class="mono">${esc(f.a.codigo)}</td>
+    <td>${esc(f.a.nombre)}${f.a.minimo && f.stock > 0 && f.stock <= f.a.minimo ? ' <span class="etq cero">Bajo mínimo</span>' : ''}${f.stock < 0 ? ' <span class="etq neg">A revisar</span>' : ''}</td>
+    <td class="num ${f.stock <= 0 ? 'cero' : ''}">${Math.max(0, f.stock)} <small>${esc(f.a.unidad)}</small></td>
+    <td class="mono" style="font-size:13px">${f.pu.filter(([, v]) => v > 0).map(([u, v]) => `${esc(ubic(u)?.codigo || 'sin ubicación')}: <b>${v}</b>`).join('<br>') || '—'}</td></tr>`).join('')
+    : `<tr><td colspan="4" class="ayuda">${arts.length ? 'No hay artículos con esa búsqueda.' : 'Todavía no hay stock cargado.'}</td></tr>`;
+}
+$('buscar').addEventListener('input', render);
+$('kpis').addEventListener('click', e => { const b = e.target.closest('[data-filtro]'); if (!b) return; filtro = b.dataset.filtro; render(); });
+$('tituloIngreso').textContent = 'Consulta de stock';
+
+iniciarSesion({ escuchar: ['inv/oficial'], usuariosDemo: [
+  { etiqueta: 'Entrar como funcionaria (Ana)', usuario: { email: 'ana@prueba', nombre: 'Ana', admin: false } }] });
+</script>
+</body>
+</html>

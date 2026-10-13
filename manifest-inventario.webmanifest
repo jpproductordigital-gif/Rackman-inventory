@@ -1,0 +1,33 @@
+{
+  "id": "/Rackman-inventory/almacen.html",
+  "name": "Rackman Inventario",
+  "short_name": "Inventario",
+  "description": "Stock, registros del almacén, escaneo y conteos.",
+  "lang": "es-UY",
+  "start_url": "/Rackman-inventory/almacen.html",
+  "scope": "/Rackman-inventory/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#172C43",
+  "theme_color": "#172C43",
+  "icons": [
+    {
+      "src": "iconos/inventario-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "iconos/inventario-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "iconos/inventario-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

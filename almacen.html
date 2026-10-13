@@ -111,6 +111,11 @@
 </style>
 
 <title>Almacén</title>
+<link rel="manifest" href="manifest-inventario.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="iconos/inventario-192.png">
+<link rel="apple-touch-icon" href="iconos/inventario-apple-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body>
 <header class="barra"><div class="cont">
@@ -456,6 +461,17 @@ async function iniciarSesion({ soloAdmin, escuchar, usuariosDemo }) {
     entrar({ email, nombre: u.displayName || email, admin });
   });
 }
+
+/* =========================================================
+   APP INSTALABLE
+   ========================================================= */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) addEventListener('load', () => navigator.serviceWorker.register('sw-rackman.js', { scope: './' }).catch(() => {}));
+let avisoInstalar = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); avisoInstalar = e;
+  let b = $('btnInstalar'); if (!b) { b = document.createElement('button'); b.id = 'btnInstalar'; b.className = 'btn acento chico'; b.textContent = 'Instalar app';
+    document.querySelector('header.barra .cont').insertBefore(b, $('quien')); b.onclick = async () => { b.hidden = true; avisoInstalar.prompt(); await avisoInstalar.userChoice; avisoInstalar = null; }; }
+  b.hidden = false; });
+addEventListener('appinstalled', () => { const b = $('btnInstalar'); if (b) b.hidden = true; toast('App instalada'); });
 
 
 /* =========================================================

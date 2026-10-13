@@ -517,7 +517,7 @@ function pintarStock() {
     <td class="num ${f.oficial < 0 ? 'neg' : f.oficial === 0 ? 'cero' : ''}">${f.oficial}</td>
     <td class="num">${f.pend ? `<span class="etq pend">${signo(f.pend)}</span>` : f.props.length ? '<span class="etq pend">0</span>' : '—'}</td>
     <td class="num ${f.proy < 0 ? 'neg' : ''}">${f.proy}</td></tr>`).join('')
-    : `<tr><td colspan="5" class="ayuda">${lista(oficial('articulos')).length ? 'No hay artículos con esa búsqueda.' : 'Todavía no hay artículos. Registrá una entrada de artículo nuevo.'}</td></tr>`;
+    : `<tr><td colspan="5" class="ayuda">${q ? `No existe ningún artículo con «${esc($('buscarStock').value.trim())}». <button class="btn chico acento" type="button" data-pasar-nuevo="${esc($('buscarStock').value.trim())}">Registrar como artículo nuevo</button>` : 'Todavía no hay artículos. Registrá una entrada de artículo nuevo.'}</td></tr>`;
 }
 $('buscarStock').addEventListener('input', pintarStock);
 document.addEventListener('click', e => { const tr = e.target.closest('[data-cod]'); if (!tr) return;
@@ -550,10 +550,13 @@ const pendienteDeAlta = c => pendientes().some(p => p.tipo === 'entrada' && p.su
 function infoArticulo() {
   const c = $('movCodigo').value.trim(), a = artPorCodigo(c), u = ubicPorCodigo($('movUbic').value), el = $('infoArticulo');
   if (!c) { el.textContent = ''; return; }
-  if (!a) { el.innerHTML = mov === 'entrada' && $('tipoEntrada').value === 'nuevo' ? 'Código nuevo: completá el nombre del artículo.' : pendienteDeAlta(c) ? '<span class="etq pend">Pendiente de alta</span> Este artículo todavía no fue aprobado.' : '<span class="neg">No existe un artículo con ese código.</span>'; return; }
+  if (!a) { el.innerHTML = mov === 'entrada' && $('tipoEntrada').value === 'nuevo' ? 'Código nuevo: completá el nombre del artículo.' : pendienteDeAlta(c) ? '<span class="etq pend">Pendiente de alta</span> Este artículo todavía no fue aprobado.' : `<span class="neg">No existe un artículo con ese código.</span>${mov === 'ajuste' ? '' : ' <button class="btn chico acento" type="button" data-pasar-nuevo>Registrar como artículo nuevo</button>'}`; return; }
   el.innerHTML = `<b>${esc(a.nombre)}</b> · stock oficial ${stockDe(a.id)} ${esc(a.unidad)}${u ? ` · en <span class="mono">${esc(u.codigo)}</span>: ${stockDe(a.id, u.id)}` : ''}`;
 }
-$('movCodigo').addEventListener('input', infoArticulo); $('movUbic').addEventListener('input', infoArticulo);
+$('movCodigo').addEventListener('input', infoArticulo);
+document.addEventListener('click', e => { if (!e.target.closest('[data-pasar-nuevo]')) return; const cod = e.target.closest('[data-pasar-nuevo]').dataset.pasarNuevo;
+  mov = 'entrada'; document.querySelectorAll('#segMov button').forEach(y => y.classList.toggle('activo', y.dataset.mov === 'entrada')); $('tipoEntrada').value = 'nuevo';
+  if (cod) { $('movCodigo').value = cod; document.querySelector('#pestanas [data-tab="registrar"]').click(); } pintarRegistrar(); $('movNombre').focus(); }); $('movUbic').addEventListener('input', infoArticulo);
 
 $('btnUsarCodigo').addEventListener('click', async () => {
   const c = $('inputCodigo').value.trim().toUpperCase(); if (!c) return;

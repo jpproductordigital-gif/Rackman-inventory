@@ -146,6 +146,7 @@
   <nav class="pestanas" id="pestanas">
     <button class="activa" data-tab="bandeja">Bandeja <span class="etq pend" id="nPend">0</span></button>
     <button data-tab="stock">Stock</button>
+    <button data-tab="articulos">Artículos</button>
     <button data-tab="registrar">Movimiento</button>
     <button data-tab="comprobantes">Comprobantes</button>
     <button data-tab="indicadores">Indicadores</button>
@@ -174,6 +175,27 @@
       <h2>Stock oficial</h2>
       <input class="buscador" id="buscarStock" type="search" placeholder="Buscar por nombre, código o ubicación…">
       <div class="caja tabla-cont"><table><thead><tr><th>Código</th><th>Artículo</th><th class="num">Stock</th><th class="num">Pendiente</th><th>Ubicaciones</th><th>Flujo</th></tr></thead><tbody id="tablaStock"></tbody></table></div>
+    </section>
+
+    <!-- ARTÍCULOS -->
+    <section data-panel="articulos" hidden>
+      <h2>Artículos</h2>
+      <p class="ayuda">Dá de alta los códigos antes de que lleguen, para que el escáner los reconozca en el almacén y en los conteos. El alta no suma stock: el stock entra con una entrada.</p>
+      <div class="caja">
+        <h3 id="tituloArt">Nuevo artículo</h3>
+        <div class="fila dos">
+          <label class="c">Código (de barras o interno)<span class="con-boton"><input id="artCodigo" class="mono" autocomplete="off" placeholder="Escaneá o escribí"><button class="btn sec chico" type="button" data-escanear="artCodigo">Escanear</button></span></label>
+          <label class="c">Nombre<input id="artNombre" placeholder="Ej. Tornillo 6 mm" maxlength="120"></label>
+        </div>
+        <div class="fila dos">
+          <label class="c">Unidad<input id="artUnidad" value="unidad" maxlength="30"></label>
+          <label class="c">Stock mínimo (aviso)<input id="artMinimo" type="number" min="0" step="1" value="0"></label>
+        </div>
+        <p class="ayuda" id="infoArt"></p>
+        <div class="botones"><button class="btn acento" id="btnGuardarArt">Dar de alta</button><button class="btn sec" id="btnCancelarArt" hidden>Cancelar edición</button></div>
+      </div>
+      <input class="buscador" id="buscarArt" type="search" placeholder="Buscar por nombre o código…">
+      <div class="caja tabla-cont"><table><thead><tr><th>Código</th><th>Artículo</th><th>Unidad</th><th class="num">Mínimo</th><th class="num">Stock</th><th></th></tr></thead><tbody id="tablaArt"></tbody></table></div>
     </section>
 
     <!-- MOVIMIENTO DIRECTO -->
@@ -669,7 +691,7 @@ function render() {
   if (!yo) return;
   $('nPend').textContent = pendientes().length;
   $('listaUbic').innerHTML = ubicacionesOrdenadas().map(u => `<option value="${esc(u.codigo)}">`).join('');
-  ({ bandeja: pintarBandeja, stock: pintarStock, registrar: pintarRegistrar, comprobantes: pintarComprobantes, indicadores: pintarIndicadores, conteos: pintarConteos, ubicaciones: pintarUbicaciones, accesos: pintarAccesos }[tab])();
+  ({ bandeja: pintarBandeja, stock: pintarStock, articulos: pintarArticulos, registrar: pintarRegistrar, comprobantes: pintarComprobantes, indicadores: pintarIndicadores, conteos: pintarConteos, ubicaciones: pintarUbicaciones, accesos: pintarAccesos }[tab])();
 }
 
 /* ---------- Bandeja ---------- */
@@ -761,6 +783,44 @@ function pintarStock() {
 $('buscarStock').addEventListener('input', pintarStock);
 document.addEventListener('click', e => { const tr = e.target.closest('[data-art]'); if (tr) verArticulo(tr.dataset.art); });
 
+/* ---------- Artículos: alta y edición sin mover stock ---------- */
+let editandoArt = null;
+function pintarArticulos() {
+  const q = $('buscarArt').value.trim().toLowerCase();
+  const as = lista(oficial('articulos')).filter(a => !q || `${a.codigo} ${a.nombre}`.toLowerCase().includes(q)).sort((x, y) => x.nombre.localeCompare(y.nombre));
+  $('tablaArt').innerHTML = as.length ? as.slice(0, 500).map(a => { const s = stockDe(a.id); return `<tr><td class="mono">${esc(a.codigo)}</td><td>${esc(a.nombre)}</td><td>${esc(a.unidad)}</td><td class="num">${a.minimo || 0}</td>
+    <td class="num ${s < 0 ? 'neg' : s === 0 ? 'cero' : ''}">${s}</td><td style="white-space:nowrap"><button class="btn sec chico" data-editar-art="${a.id}">Editar</button> <button class="btn sec chico" data-entrada-art="${esc(a.codigo)}">Entrada</button></td></tr>`; }).join('')
+    : `<tr><td colspan="6" class="ayuda">${lista(oficial('articulos')).length ? 'No hay artículos con esa búsqueda.' : 'Todavía no hay artículos. Dá de alta el primero con el formulario de arriba.'}</td></tr>`;
+  infoArt();
+}
+function infoArt() {
+  const c = $('artCodigo').value.trim(), ya = c && artPorCodigo(c);
+  $('infoArt').innerHTML = editandoArt ? 'Editando: el código no se puede cambiar porque es la referencia de toda su trazabilidad.'
+    : ya ? `<span class="neg">Ese código ya existe: ${esc(ya.nombre)}.</span> <a href="#" data-editar-art="${ya.id}">Editarlo</a>` : '';
+}
+$('artCodigo').addEventListener('input', infoArt); $('buscarArt').addEventListener('input', pintarArticulos);
+function limpiarArt() { editandoArt = null; ['artCodigo', 'artNombre'].forEach(id => $(id).value = ''); $('artUnidad').value = 'unidad'; $('artMinimo').value = 0;
+  $('artCodigo').disabled = false; $('tituloArt').textContent = 'Nuevo artículo'; $('btnGuardarArt').textContent = 'Dar de alta'; $('btnCancelarArt').hidden = true; infoArt(); }
+$('btnCancelarArt').addEventListener('click', limpiarArt);
+$('btnGuardarArt').addEventListener('click', async () => {
+  const codigo = $('artCodigo').value.trim(), nombre = $('artNombre').value.trim(), unidad = $('artUnidad').value.trim() || 'unidad', minimo = Math.max(0, Math.floor(+$('artMinimo').value || 0));
+  if (!nombre) return toast('Falta el nombre.');
+  if (editandoArt) { const a = art(editandoArt);
+    await Datos.escribir({ [`${OF}articulos/${a.id}/nombre`]: nombre, [`${OF}articulos/${a.id}/unidad`]: unidad, [`${OF}articulos/${a.id}/minimo`]: minimo, [`${OF}articulos/${a.id}/editado`]: ahora() });
+    toast('Artículo actualizado'); limpiarArt(); return; }
+  if (!codigo) return toast('Falta el código.'); if (codigo.length > 60) return toast('Código demasiado largo.');
+  if (artPorCodigo(codigo)) return toast('Ese código ya existe.');
+  const id = nid('A'); await Datos.escribir({ [`${OF}articulos/${id}`]: { id, codigo, nombre, unidad, minimo, alta: ahora(), altaPor: yo.email } });
+  toast(`${nombre} dado de alta. Ya lo reconoce el escáner.`); limpiarArt(); $('artCodigo').focus();
+});
+document.addEventListener('click', e => {
+  const ed = e.target.closest('[data-editar-art]'); if (ed) { e.preventDefault(); const a = art(ed.dataset.editarArt); if (!a) return; editandoArt = a.id;
+    $('artCodigo').value = a.codigo; $('artCodigo').disabled = true; $('artNombre').value = a.nombre; $('artUnidad').value = a.unidad; $('artMinimo').value = a.minimo || 0;
+    $('tituloArt').textContent = 'Editar artículo'; $('btnGuardarArt').textContent = 'Guardar cambios'; $('btnCancelarArt').hidden = false; infoArt(); scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const en = e.target.closest('[data-entrada-art]'); if (en) { mov = 'entrada'; altaDesdeConteo = null; document.querySelectorAll('#segMov button').forEach(y => y.classList.toggle('activo', y.dataset.mov === 'entrada'));
+    $('tipoEntrada').value = 'reposicion'; $('movCodigo').value = en.dataset.entradaArt; irA('registrar'); $('movCantidad').focus(); }
+});
+
 /* ---------- Movimiento directo ---------- */
 $('segMov').addEventListener('click', e => { const b = e.target.closest('[data-mov]'); if (!b) return; mov = b.dataset.mov; altaDesdeConteo = null; document.querySelectorAll('#segMov button').forEach(x => x.classList.toggle('activo', x === b)); pintarRegistrar(); });
 $('tipoEntrada').addEventListener('change', pintarRegistrar);
@@ -775,10 +835,11 @@ function pintarRegistrar() {
 function infoArticulo() {
   const a = artPorCodigo($('movCodigo').value), u = ubicPorCodigo($('movUbic').value), el = $('infoArticulo');
   if (!$('movCodigo').value.trim()) { el.textContent = ''; return; }
-  if (!a) { el.innerHTML = mov === 'entrada' && $('tipoEntrada').value === 'nuevo' ? 'Código nuevo: completá el nombre del artículo.' : '<span class="neg">No existe un artículo con ese código.</span>'; return; }
+  if (!a) { el.innerHTML = mov === 'entrada' && $('tipoEntrada').value === 'nuevo' ? 'Código nuevo: completá el nombre del artículo.' : `<span class="neg">No existe un artículo con ese código.</span> <button class="btn chico acento" type="button" data-pasar-nuevo>Registrar como artículo nuevo</button>`; return; }
   el.innerHTML = `<b>${esc(a.nombre)}</b> · stock total ${stockDe(a.id)} ${esc(a.unidad)}${u ? ` · en <span class="mono">${esc(u.codigo)}</span>: ${stockDe(a.id, u.id)}` : ''}`;
 }
 $('movCodigo').addEventListener('input', infoArticulo); $('movUbic').addEventListener('input', infoArticulo);
+document.addEventListener('click', e => { if (!e.target.closest('[data-pasar-nuevo]')) return; mov = 'entrada'; document.querySelectorAll('#segMov button').forEach(y => y.classList.toggle('activo', y.dataset.mov === 'entrada')); $('tipoEntrada').value = 'nuevo'; pintarRegistrar(); $('movNombre').focus(); });
 $('btnRegistrar').addEventListener('click', async () => {
   const codigo = $('movCodigo').value.trim(), cant = Number($('movCantidad').value), ubicacion = $('movUbic').value.trim(), nota = $('movNota').value.trim();
   try {

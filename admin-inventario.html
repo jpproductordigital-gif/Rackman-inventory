@@ -115,6 +115,7 @@
     .barra .cont { min-height: 48px; padding-top: 6px; padding-bottom: 6px; }
     .barra h1 { font-size: 16px; }
   }
+  .etq.tr { background: #E6E0F5; color: #5B3F9E; }
 
 </style>
 
@@ -161,7 +162,7 @@
       <h2>Bandeja de aprobación</h2>
       <p class="ayuda">Lo que registran los funcionarios llega acá. Nada cambia el stock oficial hasta que lo aprobás; al aprobar se emite el comprobante.</p>
       <div class="segmento" id="segBandeja"><button class="activo" data-ver="pend">Pendientes</button><button data-ver="rev">Revisadas</button></div>
-      <div class="segmento" id="segTipo"><button class="activo" data-tipo="">Todas</button><button data-tipo="entrada">Entradas</button><button data-tipo="salida">Salidas</button><button data-tipo="ajuste">Ajustes</button></div>
+      <div class="segmento" id="segTipo"><button class="activo" data-tipo="">Todas</button><button data-tipo="entrada">Entradas</button><button data-tipo="salida">Salidas</button><button data-tipo="traslado">Traslados</button><button data-tipo="ajuste">Ajustes</button></div>
       <div class="botones" id="accionesLote" style="margin-bottom:12px">
         <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px"><input type="checkbox" class="marca" id="marcarTodo"> Seleccionar todo</label>
         <button class="btn acento" id="btnAprobarSel" disabled>Aprobar seleccionadas</button>
@@ -202,7 +203,7 @@
     <section data-panel="registrar" hidden>
       <h2>Movimiento directo</h2>
       <p class="ayuda">Lo que registrás acá entra directo al stock oficial, con su comprobante.</p>
-      <div class="segmento" id="segMov"><button class="activo" data-mov="entrada">Entrada</button><button data-mov="salida">Salida</button><button data-mov="ajuste">Ajuste</button></div>
+      <div class="segmento" id="segMov"><button class="activo" data-mov="entrada">Entrada</button><button data-mov="salida">Salida</button><button data-mov="traslado">Traslado</button><button data-mov="ajuste">Ajuste</button></div>
       <div class="caja">
         <div class="aviso" id="avisoAlta" hidden></div>
         <div class="fila" id="filaTipoEntrada"><label class="c">Tipo de entrada<select id="tipoEntrada"><option value="nuevo">Ingreso de artículo nuevo</option><option value="reposicion">Reposición</option><option value="devolucion">Devolución</option></select></label></div>
@@ -217,8 +218,9 @@
         </div>
         <div class="fila dos">
           <label class="c" id="lblCantidad">Cantidad<input id="movCantidad" type="number" min="1" step="1" inputmode="numeric"></label>
-          <label class="c">Ubicación<span class="con-boton"><input id="movUbic" class="mono" list="listaUbic" autocomplete="off" placeholder="Escaneá o elegí"><button class="btn sec chico" type="button" data-escanear="movUbic">Escanear</button></span></label>
+          <label class="c"><span id="txtUbic">Ubicación</span><span class="con-boton"><input id="movUbic" class="mono" list="listaUbic" autocomplete="off" placeholder="Escaneá o elegí"><button class="btn sec chico" type="button" data-escanear="movUbic">Escanear</button></span></label>
         </div>
+        <div class="fila" id="filaDestino" hidden><label class="c">Ubicación de destino<span class="con-boton"><input id="movDestino" class="mono" list="listaUbic" autocomplete="off" placeholder="Escaneá o elegí adónde va"><button class="btn sec chico" type="button" data-escanear="movDestino">Escanear</button></span></label></div>
         <datalist id="listaUbic"></datalist>
         <div class="fila" id="filaRef"><label class="c">Comprobante de origen (opcional)<input id="movRef" class="mono" placeholder="Ej. 000123"></label></div>
         <label class="c" style="margin-bottom:10px">Nota<input id="movNota" placeholder="Proveedor, destino, motivo…"></label>
@@ -351,9 +353,9 @@ const lista = o => Object.values(o || {});
 const mismo = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 const signo = n => (n > 0 ? '+' : '') + n;
 function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('visible'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('visible'), 2800); }
-const TIPOS = { nuevo: 'Ingreso nuevo', reposicion: 'Reposición', devolucion: 'Devolución', egreso: 'Egreso', ajuste: 'Ajuste', anulacion: 'Anulación' };
-const CLASE_TIPO = { nuevo: 'in', reposicion: 'in', devolucion: 'in', egreso: 'out', ajuste: 'aj', anulacion: 'anulado' };
-const TIPOS_PROP = { entrada: 'Entrada', salida: 'Salida', ajuste: 'Solicitud de ajuste' };
+const TIPOS = { nuevo: 'Ingreso nuevo', reposicion: 'Reposición', devolucion: 'Devolución', egreso: 'Egreso', traslado: 'Traslado', ajuste: 'Ajuste', anulacion: 'Anulación' };
+const CLASE_TIPO = { nuevo: 'in', reposicion: 'in', devolucion: 'in', egreso: 'out', traslado: 'tr', ajuste: 'aj', anulacion: 'anulado' };
+const TIPOS_PROP = { entrada: 'Entrada', salida: 'Salida', traslado: 'Traslado', ajuste: 'Solicitud de ajuste' };
 const cargarScript = src => new Promise((ok, mal) => { if ([...document.scripts].some(s => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = mal; document.head.appendChild(s); });
 
 /* =========================================================
@@ -449,16 +451,17 @@ function detalleComp(c) {
   const a = art(c.articulo), u = ubic(c.ubicacion);
   if (c.tipo === 'anulacion') return `Anula el N.º ${nro(c.anulaNumero)}`;
   const cant = c.tipo === 'ajuste' ? `${c.antes} → ${c.despues} (${signo(c.cantidad)})` : `${c.cantidad} u`;
+  if (c.tipo === 'traslado') return `${esc(a?.nombre || '?')} · ${cant} · <span class="mono">${esc(u?.codigo || '?')} → ${esc(ubic(c.destino)?.codigo || '?')}</span>`;
   return `${esc(a?.nombre || '?')} · ${cant}${u ? ` · <span class="mono">${esc(u.codigo)}</span>` : ''}`;
 }
 function verComprobante(cid) {
   const c = oficial('comprobantes')[cid]; if (!c) return; const a = art(c.articulo), u = ubic(c.ubicacion);
-  const filasItems = (c.items || []).map(i => `<tr><td class="mono">${esc(i.lote.slice(-6).toUpperCase())}</td><td class="mono">${esc(ubic(i.ubicacion)?.codigo || '—')}</td><td class="num">${i.cantidad}</td><td>${i.negativo ? '<span class="etq neg">Faltante</span>' : i.cubreNegativo ? 'Cubre faltante' : i.loteNuevo ? 'Lote nuevo' : 'Descuento'}</td></tr>`).join('');
+  const filasItems = (c.items || []).map(i => `<tr><td class="mono">${esc(i.lote.slice(-6).toUpperCase())}</td><td class="mono">${esc(ubic(i.ubicacion)?.codigo || '—')}</td><td class="num">${i.cantidad}</td><td>${i.rol === 'sale' ? 'Sale' : i.rol === 'entra' ? `Entra (del lote ${esc(String(i.origen || '').slice(-6).toUpperCase())})` : i.negativo ? '<span class="etq neg">Faltante</span>' : i.cubreNegativo ? 'Cubre faltante' : i.loteNuevo ? 'Lote nuevo' : 'Descuento'}</td></tr>`).join('');
   abrirModal(`<div class="comprobante"><div class="cab"><div><div class="ayuda" style="margin:0">Comprobante</div><div class="nro">N.º ${nro(c.numero)}</div></div>
     <div style="text-align:right"><span class="etq ${CLASE_TIPO[c.tipo]}">${TIPOS[c.tipo]}</span>${c.anulado ? ' <span class="etq anulado">Anulado</span>' : ''}<div class="ayuda" style="margin:4px 0 0">${fmtF(c.fecha)}</div></div></div>
     ${c.tipo === 'anulacion' ? `<p>Anula el comprobante <a href="#" data-comp="${c.anula}" class="mono">N.º ${nro(c.anulaNumero)}</a>.</p>` : `
     <p><b>${esc(a?.nombre || '?')}</b> <span class="mono ayuda">${esc(a?.codigo || '')}</span></p>
-    <p>${c.tipo === 'ajuste' ? `Stock registrado ${c.antes} → real ${c.despues} (diferencia ${signo(c.cantidad)})` : `Cantidad: <b>${c.cantidad}</b> ${esc(a?.unidad || '')}`}${u ? ` · Ubicación <span class="mono">${esc(u.codigo)}</span>` : ''}</p>`}
+    <p>${c.tipo === 'ajuste' ? `Stock registrado ${c.antes} → real ${c.despues} (diferencia ${signo(c.cantidad)})` : `Cantidad: <b>${c.cantidad}</b> ${esc(a?.unidad || '')}`}${c.tipo === 'traslado' ? `<br>De <span class="mono">${verUbic(u)}</span> a <span class="mono">${verUbic(ubic(c.destino))}</span>` : u ? ` · Ubicación <span class="mono">${esc(u.codigo)}</span>` : ''}</p>`}
     ${c.ref ? `<p>Comprobante de origen: <span class="mono">${esc(c.ref)}</span></p>` : ''}${c.nota ? `<p>Nota: ${esc(c.nota)}</p>` : ''}
     ${c.propuestoPor ? `<p>Registrado en el almacén por ${esc(c.nombrePropuso || c.propuestoPor)} el ${fmtF(c.fechaPropuesta)}${c.corregido ? ' · <b>corregido por el administrador al aprobar</b>' : ''}</p>` : ''}
     ${c.codigo ? `<p>Pedido con el código temporal <span class="mono">${esc(c.codigo)}</span></p>` : ''}
@@ -474,7 +477,7 @@ function verArticulo(aid) {
   const lotes = lotesDe(aid).sort((x, y) => x.fecha - y.fecha);
   const movsDe = lid => comps.filter(c => (c.items || []).some(i => i.lote === lid));
   abrirModal(`<h2>${esc(a.nombre)}</h2><p class="mono ayuda">${esc(a.codigo)} · ${esc(a.unidad)} · stock total <b>${stockDe(aid)}</b></p>
-    ${lotes.length ? lotes.map(l => `<div class="caja"><h3 class="mono">Lote ${esc(l.id.slice(-6).toUpperCase())} ${l.negativo ? '<span class="etq neg">Faltante sin ingreso</span>' : ''}</h3>
+    ${lotes.length ? lotes.map(l => `<div class="caja"><h3 class="mono">Lote ${esc(l.id.slice(-6).toUpperCase())} ${l.negativo ? '<span class="etq neg">Faltante sin ingreso</span>' : ''}${l.origen ? ` <span class="etq tr">Trasladado desde el lote ${esc(l.origen.slice(-6).toUpperCase())}</span>` : ''}</h3>
       <p class="ayuda">Ubicación <span class="mono">${esc(ubic(l.ubicacion)?.codigo || '—')}</span> · quedan <b class="${l.restante < 0 ? 'neg' : ''}">${l.restante}</b></p>
       <ul class="linea-tiempo">${movsDe(l.id).map(c => { const i = c.items.find(x => x.lote === l.id);
         return `<li>${fmtF(c.fecha)} · <a href="#" data-comp="${c.id}" class="mono">N.º ${nro(c.numero)}</a> · ${TIPOS[c.tipo]} ${c.anulado ? '<span class="etq anulado">Anulado</span>' : ''} · ${i.cantidad} u · ${esc(c.nombrePropuso || c.nombreUsuario || c.usuario)}</li>`; }).join('')}</ul></div>`).join('') : '<p class="ayuda">Sin lotes registrados.</p>'}`);
@@ -492,6 +495,7 @@ function estadoProp(p) {
 }
 function resumenProp(p) {
   if (p.tipo === 'entrada') return `${TIPOS[p.subtipo] || 'Entrada'} · <span class="mono">${esc(p.codigo)}</span> ${esc(p.nombre || artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u → <span class="mono">${esc(p.ubicacion)}</span>`;
+  if (p.tipo === 'traslado') return `Traslado · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u de <span class="mono">${esc(p.ubicacion)}</span> a <span class="mono">${esc(p.destino)}</span>`;
   if (p.tipo === 'salida') return `Salida · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u${p.ubicacion ? ` desde <span class="mono">${esc(p.ubicacion)}</span>` : ''}`;
   return `Ajuste · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} en <span class="mono">${esc(p.ubicacion)}</span>: hay ${p.cantidadReal} en realidad`;
 }
@@ -637,6 +641,24 @@ async function registrarSalida({ codigo, cantidad, ubicacion, nota }, extra, des
   return emitirComprobante(n => { const items = planDescuento(a.id, u ? u.id : null, cantidad, cambios, n);
     return { tipo: 'egreso', articulo: a.id, ubicacion: u ? u.id : '', cantidad, nota: nota || '', items, generaNegativo: items.some(i => i.negativo) }; }, cambios, extra, despues);
 }
+/* Traslado: mueve unidades de una ubicación a otra sin cambiar el stock total.
+   Cada lote que sale da origen a un lote nuevo en el destino que conserva su fecha (para el orden FIFO) y apunta al lote original. */
+async function registrarTraslado({ codigo, cantidad, ubicacion, destino, nota }, extra, despues) {
+  const a = artPorCodigo(codigo); if (!a) throw new Error(`No existe un artículo con el código ${codigo}.`);
+  const u = ubicPorCodigo(ubicacion), d = ubicPorCodigo(destino);
+  if (!u) throw new Error(`La ubicación de origen ${ubicacion || '(vacía)'} no existe.`); if (!d) throw new Error(`La ubicación de destino ${destino || '(vacía)'} no existe.`);
+  if (u.id === d.id) throw new Error('El origen y el destino son la misma ubicación.');
+  const hay = stockDe(a.id, u.id); if (cantidad > hay) throw new Error(`En ${u.codigo} hay ${Math.max(0, hay)}: no se pueden trasladar ${cantidad}.`);
+  const cambios = {};
+  return emitirComprobante(n => {
+    const items = []; let falta = cantidad;
+    lotesDe(a.id, u.id).filter(l => l.restante > 0).sort((x, y) => x.fecha - y.fecha).forEach(l => { if (falta <= 0) return; const toma = Math.min(l.restante, falta);
+      cambios[`${OF}lotes/${l.id}/restante`] = l.restante - toma; items.push({ lote: l.id, cantidad: toma, ubicacion: u.id, rol: 'sale' });
+      const id = nid('L'); cambios[`${OF}lotes/${id}`] = { id, articulo: a.id, ubicacion: d.id, cantidad: toma, restante: toma, fecha: l.fecha, comprobante: n, tipo: l.tipo || 'traslado', origen: l.id };
+      items.push({ lote: id, cantidad: toma, ubicacion: d.id, rol: 'entra', loteNuevo: true, origen: l.id }); falta -= toma; });
+    return { tipo: 'traslado', articulo: a.id, ubicacion: u.id, destino: d.id, cantidad, nota: nota || '', items };
+  }, cambios, extra, despues);
+}
 /* Ajuste: lleva el stock de un artículo en una ubicación a la cantidad real indicada */
 async function registrarAjuste({ codigo, ubicacion, cantidadReal, nota, conteo }, extra, despues) {
   const a = artPorCodigo(codigo); if (!a) throw new Error(`No existe un artículo con el código ${codigo}.`);
@@ -651,7 +673,7 @@ async function anular(cid, motivo) {
   const c = oficial('comprobantes')[cid]; if (!c || c.anulado) throw new Error('Ese comprobante ya está anulado.');
   const cambios = {};
   (c.items || []).forEach(i => { const l = oficial('lotes')[i.lote]; if (!l) return; const actual = cambios[`${OF}lotes/${l.id}/restante`] ?? l.restante;
-    const esIngreso = ['nuevo', 'reposicion', 'devolucion'].includes(c.tipo) || (c.tipo === 'ajuste' && c.cantidad > 0);
+    const esIngreso = c.tipo === 'traslado' ? i.rol === 'entra' : ['nuevo', 'reposicion', 'devolucion'].includes(c.tipo) || (c.tipo === 'ajuste' && c.cantidad > 0);
     cambios[`${OF}lotes/${l.id}/restante`] = esIngreso ? actual - i.cantidad : actual + i.cantidad; });
   Object.assign(cambios, { [`${OF}comprobantes/${cid}/anulado`]: true, [`${OF}comprobantes/${cid}/anuladoPor`]: yo.email, [`${OF}comprobantes/${cid}/anuladoFecha`]: ahora() });
   return emitirComprobante(n => { cambios[`${OF}comprobantes/${cid}/anuladoCon`] = n; return { tipo: 'anulacion', anula: cid, anulaNumero: c.numero, articulo: c.articulo, ubicacion: c.ubicacion, cantidad: c.cantidad, nota: motivo || '' }; }, cambios);
@@ -669,6 +691,10 @@ function diagnostico(p, corr = {}) {
     if (!a && d.subtipo === 'nuevo' && !String(d.nombre || '').trim()) problemas.push('Falta el nombre del artículo nuevo.');
     if (a && d.subtipo === 'nuevo') avisos.push('El artículo ya existe: se aprobará como reposición.');
   } else if (!a) problemas.push('El artículo no existe en el stock oficial.');
+  if (d.tipo === 'traslado') { const dd = ubicPorCodigo(d.destino);
+    if (!d.ubicacion) problemas.push('Falta la ubicación de origen.'); if (!dd) problemas.push(`La ubicación de destino ${d.destino || '(vacía)'} no existe.`);
+    if (u && dd && u.id === dd.id) problemas.push('El origen y el destino son la misma ubicación.');
+    if (a && u) { const hay = stockDe(a.id, u.id); if (d.cantidad > hay) problemas.push(`En ${u.codigo} hay ${Math.max(0, hay)} en el stock oficial: no alcanza para trasladar ${d.cantidad}.`); } }
   if (a && d.tipo === 'salida') { const disp = stockDe(a.id, u ? u.id : null); if (d.cantidad > disp) avisos.push(`Deja negativo: hay ${disp} y salen ${d.cantidad}.`); }
   if (a && u && d.tipo === 'ajuste') { const act = stockDe(a.id, u.id), dif = d.cantidadReal - act; avisos.push(dif === 0 ? 'El stock oficial ya coincide: se cierra sin cambios.' : `Ajuste de ${signo(dif)} (oficial ${act} → real ${d.cantidadReal}).`); }
   return { problemas, avisos };
@@ -686,6 +712,7 @@ async function aprobar(pid, corr = {}, notaAdmin = '') {
     const tipo = d.subtipo === 'nuevo' && artPorCodigo(d.codigo) ? 'reposicion' : d.subtipo;
     return registrarEntrada({ tipo, codigo: d.codigo, nombre: d.nombre, unidad: d.unidad, minimo: d.minimo, cantidad: d.cantidad, ubicacion: d.ubicacion, nota, ref: d.ref }, extra, marcar);
   }
+  if (d.tipo === 'traslado') return registrarTraslado({ codigo: d.codigo, cantidad: d.cantidad, ubicacion: d.ubicacion, destino: d.destino, nota }, extra, marcar);
   if (d.tipo === 'salida') return registrarSalida({ codigo: d.codigo, cantidad: d.cantidad, ubicacion: d.ubicacion, nota }, extra, marcar);
   const a = artPorCodigo(d.codigo), u = ubicPorCodigo(d.ubicacion);
   if (stockDe(a.id, u.id) === d.cantidadReal) { await Datos.escribir({ [`${OF}revisiones/${pid}`]: { ...rev(null), motivo: notaAdmin || 'El stock oficial ya coincidía: no hizo falta ajustar.' } }); return null; }
@@ -724,7 +751,7 @@ function pintarBandeja() {
   $('listaBandeja').innerHTML = ps.length ? ps.slice(0, 300).map(p => { const dg = diagnostico(p), est = estadoProp(p), r = revision(p.id);
     return `<div class="tarjeta-prop"><div class="cab">
       ${verBandeja === 'pend' ? `<input type="checkbox" class="marca" data-sel="${p.id}" ${seleccion.has(p.id) ? 'checked' : ''} aria-label="Seleccionar">` : ''}
-      <span class="etq ${p.tipo === 'entrada' ? 'in' : p.tipo === 'salida' ? 'out' : 'aj'}">${TIPOS_PROP[p.tipo]}</span>
+      <span class="etq ${p.tipo === 'entrada' ? 'in' : p.tipo === 'salida' ? 'out' : p.tipo === 'traslado' ? 'tr' : 'aj'}">${TIPOS_PROP[p.tipo]}</span>
       ${verBandeja === 'rev' ? `<span class="etq ${est.clase}">${est.texto}</span>` : ''}
       <span class="ayuda" style="margin:0">${fmtF(p.fecha)} · ${esc(p.nombreUsuario)}${p.fotos ? ` · 📷 ${p.fotos}` : ''}${p.codigoTemporal ? ` · código <span class="mono">${esc(p.codigoTemporal)}</span>` : ''}</span>
       <span class="der">${verBandeja === 'pend' ? `<button class="btn chico acento" data-aprobar="${p.id}" ${dg.problemas.length ? 'disabled' : ''}>Aprobar</button><button class="btn chico sec" data-prop="${p.id}">Revisar</button>` : `<button class="btn chico sec" data-prop="${p.id}">Ver</button>`}</span></div>
@@ -762,8 +789,8 @@ async function revisar(pid) {
     ${r ? `<div class="aviso ${r.estado === 'rechazada' ? 'mal' : 'ok'}">${r.estado === 'rechazada' ? 'Rechazada' : 'Aprobada'} el ${fmtF(r.fecha)}${r.motivo ? `: ${esc(r.motivo)}` : '.'}${r.corregido ? ' Con correcciones.' : ''}${r.comprobante ? ` <a href="#" data-comp="${r.comprobante}" class="mono">Comprobante N.º ${nro(r.numero)}</a>` : ''}</div>` : `
     <div class="caja" style="margin-top:12px"><h3>Corregir antes de aprobar (opcional)</h3>
       <div class="fila dos">${campo('rvCodigo', 'Código', p.codigo, 'class="mono"')}${p.tipo === 'ajuste' ? campo('rvCant', 'Cantidad real', p.cantidadReal, 'type="number" min="0"') : campo('rvCant', 'Cantidad', p.cantidad, 'type="number" min="1"')}</div>
-      <div class="fila dos">${campo('rvUbic', p.tipo === 'salida' ? 'Ubicación (opcional)' : 'Ubicación', p.ubicacion, 'class="mono" list="listaUbic"')}
-        ${p.tipo === 'entrada' ? `<label class="c">Tipo de entrada<select id="rvSub">${['nuevo', 'reposicion', 'devolucion'].map(t => `<option value="${t}" ${t === p.subtipo ? 'selected' : ''}>${TIPOS[t]}</option>`).join('')}</select></label>` : '<span></span>'}</div>
+      <div class="fila dos">${campo('rvUbic', p.tipo === 'salida' ? 'Ubicación (opcional)' : p.tipo === 'traslado' ? 'Origen' : 'Ubicación', p.ubicacion, 'class="mono" list="listaUbic"')}
+        ${p.tipo === 'entrada' ? `<label class="c">Tipo de entrada<select id="rvSub">${['nuevo', 'reposicion', 'devolucion'].map(t => `<option value="${t}" ${t === p.subtipo ? 'selected' : ''}>${TIPOS[t]}</option>`).join('')}</select></label>` : p.tipo === 'traslado' ? campo('rvDestino', 'Destino', p.destino, 'class="mono" list="listaUbic"') : '<span></span>'}</div>
       ${p.tipo === 'entrada' ? `<div class="fila dos">${campo('rvNombre', 'Nombre (si es artículo nuevo)', p.nombre)}${campo('rvUnidad', 'Unidad', p.unidad || 'unidad')}</div>` : ''}
       <label class="c" style="margin-bottom:8px">Nota del administrador<input id="rvNota" placeholder="Queda en el comprobante y la ve el funcionario"></label>
       <div id="rvDiag"></div>
@@ -771,13 +798,14 @@ async function revisar(pid) {
   if (!r) {
     const leer = () => { const c = { codigo: $('rvCodigo').value.trim(), ubicacion: $('rvUbic').value.trim() }, n = Number($('rvCant').value);
       if (p.tipo === 'ajuste') c.cantidadReal = n; else c.cantidad = n;
+      if (p.tipo === 'traslado') c.destino = $('rvDestino').value.trim();
       if (p.tipo === 'entrada') Object.assign(c, { subtipo: $('rvSub').value, nombre: $('rvNombre').value.trim(), unidad: $('rvUnidad').value.trim() || 'unidad' });
       Object.keys(c).forEach(k => { if ((c[k] ?? '') === (p[k] ?? '') || (k === 'unidad' && !p.unidad && c[k] === 'unidad')) delete c[k]; }); return c; };
     const diag = () => { const c = leer(), d = diagnostico(p, c), n = p.tipo === 'ajuste' ? c.cantidadReal ?? p.cantidadReal : c.cantidad ?? p.cantidad;
       const malCant = !Number.isInteger(n) || n < (p.tipo === 'ajuste' ? 0 : 1); if (malCant) d.problemas.unshift('Cantidad inválida.');
       $('rvDiag').innerHTML = d.problemas.map(t => `<p class="alerta">✕ ${esc(t)}</p>`).join('') + d.avisos.map(t => `<p class="ayuda">⚠ ${esc(t)}</p>`).join('') + (Object.keys(c).length ? '<p class="ayuda"><b>Se aprobará con tus correcciones</b>; el registro original queda guardado.</p>' : '');
       $('rvAprobar').disabled = d.problemas.length > 0; };
-    ['rvCodigo', 'rvCant', 'rvUbic', 'rvSub', 'rvNombre', 'rvUnidad'].forEach(id => $(id) && $(id).addEventListener('input', diag)); diag();
+    ['rvCodigo', 'rvCant', 'rvUbic', 'rvDestino', 'rvSub', 'rvNombre', 'rvUnidad'].forEach(id => $(id) && $(id).addEventListener('input', diag)); diag();
     $('rvAprobar').onclick = async () => { try { const c = await aprobar(pid, leer(), $('rvNota').value.trim()); cerrarModal(); toast(c ? `Aprobado: comprobante N.º ${nro(c.numero)}` : 'Cerrado sin cambios'); } catch (err) { toast(err.message); } };
     $('rvRechazar').onclick = async () => { const m = $('rvNota').value.trim() || prompt('Motivo del rechazo (lo ve el funcionario):'); if (m === null) return; try { await rechazar(pid, m); cerrarModal(); toast('Rechazado'); } catch (err) { toast(err.message); } };
   }
@@ -786,7 +814,7 @@ async function revisar(pid) {
 
 /* ---------- Stock ---------- */
 const pendientePor = () => { const m = {}; pendientes().forEach(p => { const a = artPorCodigo(p.codigo); if (!a) return;
-  const u = ubicPorCodigo(p.ubicacion); const d = p.tipo === 'entrada' ? p.cantidad : p.tipo === 'salida' ? -p.cantidad : (u ? p.cantidadReal - stockDe(a.id, u.id) : 0); m[a.id] = (m[a.id] || 0) + d; }); return m; };
+  const u = ubicPorCodigo(p.ubicacion); const d = p.tipo === 'entrada' ? p.cantidad : p.tipo === 'salida' ? -p.cantidad : p.tipo === 'traslado' ? 0 : (u ? p.cantidadReal - stockDe(a.id, u.id) : 0); m[a.id] = (m[a.id] || 0) + d; }); return m; };
 function pintarStock() {
   const q = $('buscarStock').value.trim().toLowerCase(), filas = analisisFlujo(+$('periodo').value, +$('diasInmovil').value || 60), pend = pendientePor();
   const vis = filas.filter(f => !q || [f.a.codigo, f.a.nombre, ...Object.keys(porUbicacion(f.a.id)).map(u => ubic(u)?.codigo || '')].join(' ').toLowerCase().includes(q)).sort((x, y) => x.a.nombre.localeCompare(y.a.nombre));
@@ -844,7 +872,8 @@ function pintarRegistrar() {
   const tipo = $('tipoEntrada').value, ent = mov === 'entrada', aj = mov === 'ajuste';
   $('filaTipoEntrada').hidden = !ent; $('filaNuevo').hidden = !(ent && tipo === 'nuevo'); $('lblNombre').hidden = !(ent && tipo === 'nuevo'); $('filaRef').hidden = !(ent && tipo === 'devolucion');
   $('lblCantidad').firstChild.textContent = aj ? 'Cantidad real' : 'Cantidad'; $('movCantidad').min = aj ? 0 : 1;
-  $('btnRegistrar').textContent = aj ? 'Registrar ajuste' : ent ? 'Registrar entrada y emitir comprobante' : 'Registrar salida y emitir comprobante';
+  $('btnRegistrar').textContent = aj ? 'Registrar ajuste' : ent ? 'Registrar entrada y emitir comprobante' : mov === 'traslado' ? 'Registrar traslado y emitir comprobante' : 'Registrar salida y emitir comprobante';
+  $('filaDestino').hidden = mov !== 'traslado'; $('txtUbic').textContent = mov === 'traslado' ? 'Ubicación de origen' : mov === 'salida' ? 'Ubicación (opcional)' : 'Ubicación';
   $('avisoAlta').hidden = !altaDesdeConteo; if (altaDesdeConteo) $('avisoAlta').textContent = `Alta de un artículo encontrado en el conteo ${altaDesdeConteo.kid.slice(-6).toUpperCase()}. Completá el nombre y registrá.`;
   infoArticulo();
 }
@@ -867,8 +896,9 @@ $('btnRegistrar').addEventListener('click', async () => {
       comp = await registrarEntrada({ tipo: $('tipoEntrada').value, codigo, nombre: $('movNombre').value, unidad: $('movUnidad').value.trim(), minimo: $('movMinimo').value, cantidad: cant, ubicacion, nota, ref: $('movRef').value.trim() }, alta ? { conteo: alta.kid } : {}, despues);
       if (alta) { altaDesdeConteo = null; await revisarResuelto(alta.kid); } }
     else if (mov === 'salida') comp = await registrarSalida({ codigo, cantidad: cant, ubicacion, nota });
+    else if (mov === 'traslado') comp = await registrarTraslado({ codigo, cantidad: cant, ubicacion, destino: $('movDestino').value.trim(), nota });
     else { if (!ubicacion) throw new Error('Indicá la ubicación.'); comp = await registrarAjuste({ codigo, ubicacion, cantidadReal: cant, nota }); }
-    ['movCodigo', 'movNombre', 'movCantidad', 'movNota', 'movRef'].forEach(id => $(id).value = ''); pintarRegistrar();
+    ['movCodigo', 'movNombre', 'movCantidad', 'movNota', 'movRef', 'movDestino'].forEach(id => $(id).value = ''); pintarRegistrar();
     verComprobante(comp.id);
   } catch (err) { toast(err.message || 'No se pudo registrar.'); }
 });

@@ -115,6 +115,7 @@
     .barra .cont { min-height: 48px; padding-top: 6px; padding-bottom: 6px; }
     .barra h1 { font-size: 16px; }
   }
+  .etq.tr { background: #E6E0F5; color: #5B3F9E; }
 
 </style>
 
@@ -166,7 +167,7 @@
     <section data-panel="registrar" hidden>
       <h2>Registrar movimiento</h2>
       <div class="aviso">Lo que registres acá queda <b>pendiente</b>: no cambia el stock oficial hasta que el administrador lo apruebe. Queda firmado con tu cuenta y no se puede modificar.</div>
-      <div class="segmento" id="segMov"><button class="activo" data-mov="entrada">Entrada</button><button data-mov="salida">Salida</button><button data-mov="ajuste">Pedir ajuste</button></div>
+      <div class="segmento" id="segMov"><button class="activo" data-mov="entrada">Entrada</button><button data-mov="salida">Salida</button><button data-mov="traslado">Traslado</button><button data-mov="ajuste">Pedir ajuste</button></div>
 
       <div class="caja" id="cajaCodigo" hidden>
         <h3>Código temporal</h3>
@@ -190,6 +191,7 @@
           <label class="c" id="lblCantidad">Cantidad<input id="movCantidad" type="number" min="1" step="1" inputmode="numeric"></label>
           <label class="c"><span id="txtUbic">Ubicación</span><span class="con-boton"><input id="movUbic" class="mono" list="listaUbic" autocomplete="off" placeholder="Escaneá o elegí"><button class="btn sec chico" type="button" data-escanear="movUbic">Escanear</button></span></label>
         </div>
+        <div class="fila" id="filaDestino" hidden><label class="c">Ubicación de destino<span class="con-boton"><input id="movDestino" class="mono" list="listaUbic" autocomplete="off" placeholder="Escaneá o elegí adónde va"><button class="btn sec chico" type="button" data-escanear="movDestino">Escanear</button></span></label></div>
         <datalist id="listaUbic"></datalist>
         <div class="fila" id="filaRef"><label class="c">Comprobante de origen (opcional)<input id="movRef" class="mono" placeholder="Ej. 000123"></label></div>
         <label class="c" style="margin-bottom:10px">Nota<input id="movNota" placeholder="Proveedor, destino, motivo…" maxlength="400"></label>
@@ -248,9 +250,9 @@ const lista = o => Object.values(o || {});
 const mismo = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 const signo = n => (n > 0 ? '+' : '') + n;
 function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('visible'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('visible'), 2800); }
-const TIPOS = { nuevo: 'Ingreso nuevo', reposicion: 'Reposición', devolucion: 'Devolución', egreso: 'Egreso', ajuste: 'Ajuste', anulacion: 'Anulación' };
-const CLASE_TIPO = { nuevo: 'in', reposicion: 'in', devolucion: 'in', egreso: 'out', ajuste: 'aj', anulacion: 'anulado' };
-const TIPOS_PROP = { entrada: 'Entrada', salida: 'Salida', ajuste: 'Solicitud de ajuste' };
+const TIPOS = { nuevo: 'Ingreso nuevo', reposicion: 'Reposición', devolucion: 'Devolución', egreso: 'Egreso', traslado: 'Traslado', ajuste: 'Ajuste', anulacion: 'Anulación' };
+const CLASE_TIPO = { nuevo: 'in', reposicion: 'in', devolucion: 'in', egreso: 'out', traslado: 'tr', ajuste: 'aj', anulacion: 'anulado' };
+const TIPOS_PROP = { entrada: 'Entrada', salida: 'Salida', traslado: 'Traslado', ajuste: 'Solicitud de ajuste' };
 const cargarScript = src => new Promise((ok, mal) => { if ([...document.scripts].some(s => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = mal; document.head.appendChild(s); });
 
 /* =========================================================
@@ -346,16 +348,17 @@ function detalleComp(c) {
   const a = art(c.articulo), u = ubic(c.ubicacion);
   if (c.tipo === 'anulacion') return `Anula el N.º ${nro(c.anulaNumero)}`;
   const cant = c.tipo === 'ajuste' ? `${c.antes} → ${c.despues} (${signo(c.cantidad)})` : `${c.cantidad} u`;
+  if (c.tipo === 'traslado') return `${esc(a?.nombre || '?')} · ${cant} · <span class="mono">${esc(u?.codigo || '?')} → ${esc(ubic(c.destino)?.codigo || '?')}</span>`;
   return `${esc(a?.nombre || '?')} · ${cant}${u ? ` · <span class="mono">${esc(u.codigo)}</span>` : ''}`;
 }
 function verComprobante(cid) {
   const c = oficial('comprobantes')[cid]; if (!c) return; const a = art(c.articulo), u = ubic(c.ubicacion);
-  const filasItems = (c.items || []).map(i => `<tr><td class="mono">${esc(i.lote.slice(-6).toUpperCase())}</td><td class="mono">${esc(ubic(i.ubicacion)?.codigo || '—')}</td><td class="num">${i.cantidad}</td><td>${i.negativo ? '<span class="etq neg">Faltante</span>' : i.cubreNegativo ? 'Cubre faltante' : i.loteNuevo ? 'Lote nuevo' : 'Descuento'}</td></tr>`).join('');
+  const filasItems = (c.items || []).map(i => `<tr><td class="mono">${esc(i.lote.slice(-6).toUpperCase())}</td><td class="mono">${esc(ubic(i.ubicacion)?.codigo || '—')}</td><td class="num">${i.cantidad}</td><td>${i.rol === 'sale' ? 'Sale' : i.rol === 'entra' ? `Entra (del lote ${esc(String(i.origen || '').slice(-6).toUpperCase())})` : i.negativo ? '<span class="etq neg">Faltante</span>' : i.cubreNegativo ? 'Cubre faltante' : i.loteNuevo ? 'Lote nuevo' : 'Descuento'}</td></tr>`).join('');
   abrirModal(`<div class="comprobante"><div class="cab"><div><div class="ayuda" style="margin:0">Comprobante</div><div class="nro">N.º ${nro(c.numero)}</div></div>
     <div style="text-align:right"><span class="etq ${CLASE_TIPO[c.tipo]}">${TIPOS[c.tipo]}</span>${c.anulado ? ' <span class="etq anulado">Anulado</span>' : ''}<div class="ayuda" style="margin:4px 0 0">${fmtF(c.fecha)}</div></div></div>
     ${c.tipo === 'anulacion' ? `<p>Anula el comprobante <a href="#" data-comp="${c.anula}" class="mono">N.º ${nro(c.anulaNumero)}</a>.</p>` : `
     <p><b>${esc(a?.nombre || '?')}</b> <span class="mono ayuda">${esc(a?.codigo || '')}</span></p>
-    <p>${c.tipo === 'ajuste' ? `Stock registrado ${c.antes} → real ${c.despues} (diferencia ${signo(c.cantidad)})` : `Cantidad: <b>${c.cantidad}</b> ${esc(a?.unidad || '')}`}${u ? ` · Ubicación <span class="mono">${esc(u.codigo)}</span>` : ''}</p>`}
+    <p>${c.tipo === 'ajuste' ? `Stock registrado ${c.antes} → real ${c.despues} (diferencia ${signo(c.cantidad)})` : `Cantidad: <b>${c.cantidad}</b> ${esc(a?.unidad || '')}`}${c.tipo === 'traslado' ? `<br>De <span class="mono">${verUbic(u)}</span> a <span class="mono">${verUbic(ubic(c.destino))}</span>` : u ? ` · Ubicación <span class="mono">${esc(u.codigo)}</span>` : ''}</p>`}
     ${c.ref ? `<p>Comprobante de origen: <span class="mono">${esc(c.ref)}</span></p>` : ''}${c.nota ? `<p>Nota: ${esc(c.nota)}</p>` : ''}
     ${c.propuestoPor ? `<p>Registrado en el almacén por ${esc(c.nombrePropuso || c.propuestoPor)} el ${fmtF(c.fechaPropuesta)}${c.corregido ? ' · <b>corregido por el administrador al aprobar</b>' : ''}</p>` : ''}
     ${c.codigo ? `<p>Pedido con el código temporal <span class="mono">${esc(c.codigo)}</span></p>` : ''}
@@ -371,7 +374,7 @@ function verArticulo(aid) {
   const lotes = lotesDe(aid).sort((x, y) => x.fecha - y.fecha);
   const movsDe = lid => comps.filter(c => (c.items || []).some(i => i.lote === lid));
   abrirModal(`<h2>${esc(a.nombre)}</h2><p class="mono ayuda">${esc(a.codigo)} · ${esc(a.unidad)} · stock total <b>${stockDe(aid)}</b></p>
-    ${lotes.length ? lotes.map(l => `<div class="caja"><h3 class="mono">Lote ${esc(l.id.slice(-6).toUpperCase())} ${l.negativo ? '<span class="etq neg">Faltante sin ingreso</span>' : ''}</h3>
+    ${lotes.length ? lotes.map(l => `<div class="caja"><h3 class="mono">Lote ${esc(l.id.slice(-6).toUpperCase())} ${l.negativo ? '<span class="etq neg">Faltante sin ingreso</span>' : ''}${l.origen ? ` <span class="etq tr">Trasladado desde el lote ${esc(l.origen.slice(-6).toUpperCase())}</span>` : ''}</h3>
       <p class="ayuda">Ubicación <span class="mono">${esc(ubic(l.ubicacion)?.codigo || '—')}</span> · quedan <b class="${l.restante < 0 ? 'neg' : ''}">${l.restante}</b></p>
       <ul class="linea-tiempo">${movsDe(l.id).map(c => { const i = c.items.find(x => x.lote === l.id);
         return `<li>${fmtF(c.fecha)} · <a href="#" data-comp="${c.id}" class="mono">N.º ${nro(c.numero)}</a> · ${TIPOS[c.tipo]} ${c.anulado ? '<span class="etq anulado">Anulado</span>' : ''} · ${i.cantidad} u · ${esc(c.nombrePropuso || c.nombreUsuario || c.usuario)}</li>`; }).join('')}</ul></div>`).join('') : '<p class="ayuda">Sin lotes registrados.</p>'}`);
@@ -389,6 +392,7 @@ function estadoProp(p) {
 }
 function resumenProp(p) {
   if (p.tipo === 'entrada') return `${TIPOS[p.subtipo] || 'Entrada'} · <span class="mono">${esc(p.codigo)}</span> ${esc(p.nombre || artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u → <span class="mono">${esc(p.ubicacion)}</span>`;
+  if (p.tipo === 'traslado') return `Traslado · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u de <span class="mono">${esc(p.ubicacion)}</span> a <span class="mono">${esc(p.destino)}</span>`;
   if (p.tipo === 'salida') return `Salida · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u${p.ubicacion ? ` desde <span class="mono">${esc(p.ubicacion)}</span>` : ''}`;
   return `Ajuste · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} en <span class="mono">${esc(p.ubicacion)}</span>: hay ${p.cantidadReal} en realidad`;
 }
@@ -506,7 +510,7 @@ function proyeccion() {
     const k = String(p.codigo).toLowerCase();
     const f = m[k] || (m[k] = { codigo: p.codigo, nombre: p.nombre || '', unidad: p.unidad || '', oficial: 0, pend: 0, props: [], nuevo: true });
     let d = 0;
-    if (p.tipo === 'entrada') d = p.cantidad; else if (p.tipo === 'salida') d = -p.cantidad;
+    if (p.tipo === 'entrada') d = p.cantidad; else if (p.tipo === 'salida') d = -p.cantidad; else if (p.tipo === 'traslado') d = 0;
     else { const u = ubicPorCodigo(p.ubicacion); d = f.a && u ? p.cantidadReal - stockDe(f.a.id, u.id) : 0; }
     f.pend += d; f.props.push(p);
   });
@@ -541,8 +545,9 @@ function pintarRegistrar() {
   $('filaTipoEntrada').hidden = !ent; $('filaNuevo').hidden = !nuevo; $('lblNombre').hidden = !nuevo; $('filaRef').hidden = !(ent && tipo === 'devolucion');
   $('lblCantidad').firstChild.textContent = aj ? 'Cantidad que hay realmente' : 'Cantidad';
   $('movCantidad').min = aj ? 0 : 1;
-  $('txtUbic').textContent = mov === 'salida' ? 'Ubicación (opcional)' : 'Ubicación';
-  $('btnEnviar').textContent = aj ? 'Enviar pedido de ajuste' : 'Enviar para aprobación';
+  $('txtUbic').textContent = mov === 'salida' ? 'Ubicación (opcional)' : mov === 'traslado' ? 'Ubicación de origen' : 'Ubicación';
+  $('filaDestino').hidden = mov !== 'traslado';
+  $('btnEnviar').textContent = aj ? 'Enviar pedido de ajuste' : mov === 'traslado' ? 'Enviar traslado para aprobación' : 'Enviar para aprobación';
   $('cajaCodigo').hidden = !aj;
   const ok = codigoVigente(datosCodigo), av = $('avisoCodigo');
   if (aj) { av.hidden = !codigoSesion; if (codigoSesion) { av.className = ok ? 'aviso ok' : 'aviso mal'; av.textContent = ok ? `Código ${codigoSesion} válido: te quedan ${datosCodigo.usosRestantes} uso${datosCodigo.usosRestantes === 1 ? '' : 's'} hasta ${fmtF(datosCodigo.vence)}.` : `El código ${codigoSesion} ya no sirve (vencido, sin usos o revocado).`; } }
@@ -631,6 +636,14 @@ $('btnEnviar').addEventListener('click', async () => {
     } else if (mov === 'salida') {
       if (!existe) throw new Error('No existe un artículo con ese código.');
       datos = { tipo: 'salida', codigo, cantidad: cant, ubicacion: u ? u.codigo : '', nota };
+    } else if (mov === 'traslado') {
+      const a = artPorCodigo(codigo); if (!a) throw new Error('Solo se pueden trasladar artículos ya aprobados.');
+      if (!u) throw new Error('Indicá la ubicación de origen.');
+      const dTxt = $('movDestino').value.trim(), d = ubicPorCodigo(dTxt);
+      if (!dTxt) throw new Error('Indicá la ubicación de destino.'); if (!d) throw new Error('La ubicación de destino no existe.');
+      if (d.id === u.id) throw new Error('El origen y el destino son la misma ubicación.');
+      const hay = stockDe(a.id, u.id); if (cant > hay) throw new Error(`En ${u.codigo} hay ${Math.max(0, hay)} según el stock oficial: no se pueden trasladar ${cant}.`);
+      datos = { tipo: 'traslado', codigo, cantidad: cant, ubicacion: u.codigo, destino: d.codigo, nota };
     } else {
       if (!codigoVigente(datosCodigo)) throw new Error('Necesitás un código temporal válido.');
       if (!artPorCodigo(codigo)) throw new Error('Solo se pueden pedir ajustes de artículos ya aprobados.');
@@ -639,7 +652,7 @@ $('btnEnviar').addEventListener('click', async () => {
     }
     btn.disabled = true;
     await enviarPropuesta(datos);
-    ['movCodigo', 'movNombre', 'movCantidad', 'movNota', 'movRef'].forEach(id => $(id).value = ''); fotos = [];
+    ['movCodigo', 'movNombre', 'movCantidad', 'movNota', 'movRef', 'movDestino'].forEach(id => $(id).value = ''); fotos = [];
     pintarRegistrar(); toast('Enviado. Queda pendiente de aprobación.');
   } catch (err) { toast(err.code === 'PERMISSION_DENIED' || /permission/i.test(err.message) ? 'La base rechazó el registro (sin permiso o código inválido).' : err.message || 'No se pudo enviar.'); }
   finally { btn.disabled = false; }

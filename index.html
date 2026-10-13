@@ -115,6 +115,7 @@
     .barra .cont { min-height: 48px; padding-top: 6px; padding-bottom: 6px; }
     .barra h1 { font-size: 16px; }
   }
+  .etq.tr { background: #E6E0F5; color: #5B3F9E; }
 
 </style>
 
@@ -184,9 +185,9 @@ const lista = o => Object.values(o || {});
 const mismo = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 const signo = n => (n > 0 ? '+' : '') + n;
 function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('visible'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('visible'), 2800); }
-const TIPOS = { nuevo: 'Ingreso nuevo', reposicion: 'Reposición', devolucion: 'Devolución', egreso: 'Egreso', ajuste: 'Ajuste', anulacion: 'Anulación' };
-const CLASE_TIPO = { nuevo: 'in', reposicion: 'in', devolucion: 'in', egreso: 'out', ajuste: 'aj', anulacion: 'anulado' };
-const TIPOS_PROP = { entrada: 'Entrada', salida: 'Salida', ajuste: 'Solicitud de ajuste' };
+const TIPOS = { nuevo: 'Ingreso nuevo', reposicion: 'Reposición', devolucion: 'Devolución', egreso: 'Egreso', traslado: 'Traslado', ajuste: 'Ajuste', anulacion: 'Anulación' };
+const CLASE_TIPO = { nuevo: 'in', reposicion: 'in', devolucion: 'in', egreso: 'out', traslado: 'tr', ajuste: 'aj', anulacion: 'anulado' };
+const TIPOS_PROP = { entrada: 'Entrada', salida: 'Salida', traslado: 'Traslado', ajuste: 'Solicitud de ajuste' };
 const cargarScript = src => new Promise((ok, mal) => { if ([...document.scripts].some(s => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = mal; document.head.appendChild(s); });
 
 /* =========================================================
@@ -282,16 +283,17 @@ function detalleComp(c) {
   const a = art(c.articulo), u = ubic(c.ubicacion);
   if (c.tipo === 'anulacion') return `Anula el N.º ${nro(c.anulaNumero)}`;
   const cant = c.tipo === 'ajuste' ? `${c.antes} → ${c.despues} (${signo(c.cantidad)})` : `${c.cantidad} u`;
+  if (c.tipo === 'traslado') return `${esc(a?.nombre || '?')} · ${cant} · <span class="mono">${esc(u?.codigo || '?')} → ${esc(ubic(c.destino)?.codigo || '?')}</span>`;
   return `${esc(a?.nombre || '?')} · ${cant}${u ? ` · <span class="mono">${esc(u.codigo)}</span>` : ''}`;
 }
 function verComprobante(cid) {
   const c = oficial('comprobantes')[cid]; if (!c) return; const a = art(c.articulo), u = ubic(c.ubicacion);
-  const filasItems = (c.items || []).map(i => `<tr><td class="mono">${esc(i.lote.slice(-6).toUpperCase())}</td><td class="mono">${esc(ubic(i.ubicacion)?.codigo || '—')}</td><td class="num">${i.cantidad}</td><td>${i.negativo ? '<span class="etq neg">Faltante</span>' : i.cubreNegativo ? 'Cubre faltante' : i.loteNuevo ? 'Lote nuevo' : 'Descuento'}</td></tr>`).join('');
+  const filasItems = (c.items || []).map(i => `<tr><td class="mono">${esc(i.lote.slice(-6).toUpperCase())}</td><td class="mono">${esc(ubic(i.ubicacion)?.codigo || '—')}</td><td class="num">${i.cantidad}</td><td>${i.rol === 'sale' ? 'Sale' : i.rol === 'entra' ? `Entra (del lote ${esc(String(i.origen || '').slice(-6).toUpperCase())})` : i.negativo ? '<span class="etq neg">Faltante</span>' : i.cubreNegativo ? 'Cubre faltante' : i.loteNuevo ? 'Lote nuevo' : 'Descuento'}</td></tr>`).join('');
   abrirModal(`<div class="comprobante"><div class="cab"><div><div class="ayuda" style="margin:0">Comprobante</div><div class="nro">N.º ${nro(c.numero)}</div></div>
     <div style="text-align:right"><span class="etq ${CLASE_TIPO[c.tipo]}">${TIPOS[c.tipo]}</span>${c.anulado ? ' <span class="etq anulado">Anulado</span>' : ''}<div class="ayuda" style="margin:4px 0 0">${fmtF(c.fecha)}</div></div></div>
     ${c.tipo === 'anulacion' ? `<p>Anula el comprobante <a href="#" data-comp="${c.anula}" class="mono">N.º ${nro(c.anulaNumero)}</a>.</p>` : `
     <p><b>${esc(a?.nombre || '?')}</b> <span class="mono ayuda">${esc(a?.codigo || '')}</span></p>
-    <p>${c.tipo === 'ajuste' ? `Stock registrado ${c.antes} → real ${c.despues} (diferencia ${signo(c.cantidad)})` : `Cantidad: <b>${c.cantidad}</b> ${esc(a?.unidad || '')}`}${u ? ` · Ubicación <span class="mono">${esc(u.codigo)}</span>` : ''}</p>`}
+    <p>${c.tipo === 'ajuste' ? `Stock registrado ${c.antes} → real ${c.despues} (diferencia ${signo(c.cantidad)})` : `Cantidad: <b>${c.cantidad}</b> ${esc(a?.unidad || '')}`}${c.tipo === 'traslado' ? `<br>De <span class="mono">${verUbic(u)}</span> a <span class="mono">${verUbic(ubic(c.destino))}</span>` : u ? ` · Ubicación <span class="mono">${esc(u.codigo)}</span>` : ''}</p>`}
     ${c.ref ? `<p>Comprobante de origen: <span class="mono">${esc(c.ref)}</span></p>` : ''}${c.nota ? `<p>Nota: ${esc(c.nota)}</p>` : ''}
     ${c.propuestoPor ? `<p>Registrado en el almacén por ${esc(c.nombrePropuso || c.propuestoPor)} el ${fmtF(c.fechaPropuesta)}${c.corregido ? ' · <b>corregido por el administrador al aprobar</b>' : ''}</p>` : ''}
     ${c.codigo ? `<p>Pedido con el código temporal <span class="mono">${esc(c.codigo)}</span></p>` : ''}
@@ -307,7 +309,7 @@ function verArticulo(aid) {
   const lotes = lotesDe(aid).sort((x, y) => x.fecha - y.fecha);
   const movsDe = lid => comps.filter(c => (c.items || []).some(i => i.lote === lid));
   abrirModal(`<h2>${esc(a.nombre)}</h2><p class="mono ayuda">${esc(a.codigo)} · ${esc(a.unidad)} · stock total <b>${stockDe(aid)}</b></p>
-    ${lotes.length ? lotes.map(l => `<div class="caja"><h3 class="mono">Lote ${esc(l.id.slice(-6).toUpperCase())} ${l.negativo ? '<span class="etq neg">Faltante sin ingreso</span>' : ''}</h3>
+    ${lotes.length ? lotes.map(l => `<div class="caja"><h3 class="mono">Lote ${esc(l.id.slice(-6).toUpperCase())} ${l.negativo ? '<span class="etq neg">Faltante sin ingreso</span>' : ''}${l.origen ? ` <span class="etq tr">Trasladado desde el lote ${esc(l.origen.slice(-6).toUpperCase())}</span>` : ''}</h3>
       <p class="ayuda">Ubicación <span class="mono">${esc(ubic(l.ubicacion)?.codigo || '—')}</span> · quedan <b class="${l.restante < 0 ? 'neg' : ''}">${l.restante}</b></p>
       <ul class="linea-tiempo">${movsDe(l.id).map(c => { const i = c.items.find(x => x.lote === l.id);
         return `<li>${fmtF(c.fecha)} · <a href="#" data-comp="${c.id}" class="mono">N.º ${nro(c.numero)}</a> · ${TIPOS[c.tipo]} ${c.anulado ? '<span class="etq anulado">Anulado</span>' : ''} · ${i.cantidad} u · ${esc(c.nombrePropuso || c.nombreUsuario || c.usuario)}</li>`; }).join('')}</ul></div>`).join('') : '<p class="ayuda">Sin lotes registrados.</p>'}`);
@@ -325,6 +327,7 @@ function estadoProp(p) {
 }
 function resumenProp(p) {
   if (p.tipo === 'entrada') return `${TIPOS[p.subtipo] || 'Entrada'} · <span class="mono">${esc(p.codigo)}</span> ${esc(p.nombre || artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u → <span class="mono">${esc(p.ubicacion)}</span>`;
+  if (p.tipo === 'traslado') return `Traslado · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u de <span class="mono">${esc(p.ubicacion)}</span> a <span class="mono">${esc(p.destino)}</span>`;
   if (p.tipo === 'salida') return `Salida · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u${p.ubicacion ? ` desde <span class="mono">${esc(p.ubicacion)}</span>` : ''}`;
   return `Ajuste · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} en <span class="mono">${esc(p.ubicacion)}</span>: hay ${p.cantidadReal} en realidad`;
 }

@@ -196,10 +196,12 @@
         <div class="fila" id="filaRef"><label class="c">Comprobante de origen (opcional)<input id="movRef" class="mono" placeholder="Ej. 000123"></label></div>
         <label class="c" style="margin-bottom:10px">Nota<input id="movNota" placeholder="Proveedor, destino, motivo…" maxlength="400"></label>
         <div>
-          <span class="c" style="font-size:12.5px;font-weight:600;color:var(--texto-2)">Fotos (hasta 3, se comprimen solas)</span>
+          <span class="c" style="font-size:12.5px;font-weight:600;color:var(--texto-2)">Fotos (opcional, hasta 3, se comprimen solas)</span>
           <div class="fotos" id="fotosPrevia"></div>
-          <input type="file" id="fotoInput" accept="image/*" capture="environment" hidden>
-          <button class="btn sec chico" type="button" id="btnFoto">Agregar foto</button>
+          <input type="file" id="fotoCamara" accept="image/*" capture="environment" hidden>
+          <input type="file" id="fotoGaleria" accept="image/*" hidden>
+          <div class="botones"><button class="btn sec chico" type="button" id="btnFoto">Sacar foto</button><button class="btn sec chico" type="button" id="btnGaleria">Elegir de la galería</button></div>
+          <p class="ayuda">Si la app se reinicia al sacar la foto, no se pierde nada: el formulario queda guardado. También podés sacar la foto antes con la cámara del teléfono (con fecha y hora) y elegirla de la galería, o mandarla por WhatsApp al administrador anotando en la nota la fecha, la hora y tu nombre.</p>
         </div>
         <div class="botones" style="margin-top:14px"><button class="btn acento" id="btnEnviar">Enviar para aprobación</button></div>
       </div>
@@ -397,8 +399,29 @@ function resumenProp(p) {
   if (p.tipo === 'salida') return `Salida · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u${p.ubicacion ? ` desde <span class="mono">${esc(p.ubicacion)}</span>` : ''}`;
   return `Ajuste · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} en <span class="mono">${esc(p.ubicacion)}</span>: hay ${p.cantidadReal} en realidad`;
 }
+/* Fotos: se reducen y comprimen en el celular antes de guardarlas (≈ 30–60 KB cada una) */
+const LIMITE_FOTO = 80000; // caracteres del texto de la imagen (≈ 60 KB)
+async function comprimirFoto(archivo) {
+  let img;
+  try { img = await createImageBitmap(archivo, { imageOrientation: 'from-image' }); }
+  catch (e) { img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = URL.createObjectURL(archivo); }); }
+  const w0 = img.width, h0 = img.height, cv = document.createElement('canvas'), cx = cv.getContext('2d');
+  const webp = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp');
+  let lado = 1280, q = 0.72, url = '';
+  for (let i = 0; i < 12; i++) {
+    const f = Math.min(1, lado / Math.max(w0, h0)); cv.width = Math.round(w0 * f); cv.height = Math.round(h0 * f);
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+    url = cv.toDataURL(webp ? 'image/webp' : 'image/jpeg', q);
+    if (url.length <= LIMITE_FOTO) return url;
+    if (q > 0.45) q -= 0.1; else lado = Math.round(lado * 0.8);
+  }
+  if (url.length > LIMITE_FOTO) throw new Error('No se pudo achicar la foto lo suficiente.');
+  return url;
+}
+/* Fotos de un registro: las que mandó el funcionario más las que adjuntó el administrador */
+const nFotos = p => Math.max(p.fotos || 0, oficial('adjuntos')[p.id] || 0);
 async function htmlFotos(p) {
-  if (!p.fotos) return '';
+  if (!nFotos(p)) return '';
   try { const fs = await Datos.fotos(p.id); return `<div class="fotos">${fs.map(f => `<img src="${esc(f)}" alt="Foto adjunta" data-ampliar>`).join('')}</div>`; }
   catch (e) { return '<p class="ayuda">No se pudieron cargar las fotos.</p>'; }
 }
@@ -499,6 +522,7 @@ $('pestanas').addEventListener('click', e => { const b = e.target.closest('[data
   document.querySelectorAll('[data-panel]').forEach(s => s.hidden = s.dataset.panel !== tab); render(); scrollTo(0, 0); });
 function render() {
   if (!yo) return;
+  if (!borradorRevisado) { setTimeout(recuperarBorrador, 0); }
   $('listaUbic').innerHTML = opcionesUbic();
   ({ stock: pintarStock, registrar: pintarRegistrar, conteos: pintarConteos, registros: pintarRegistros }[tab])();
 }
@@ -577,36 +601,38 @@ $('btnUsarCodigo').addEventListener('click', async () => {
   codigoSesion = c; datosCodigo = d; $('inputCodigo').value = ''; pintarRegistrar(); toast('Código validado');
 });
 
-/* Fotos: se reducen y comprimen en el celular antes de guardarlas (≈ 30–60 KB cada una) */
-const LIMITE_FOTO = 80000; // caracteres del texto de la imagen (≈ 60 KB)
-async function comprimirFoto(archivo) {
-  let img;
-  try { img = await createImageBitmap(archivo, { imageOrientation: 'from-image' }); }
-  catch (e) { img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = URL.createObjectURL(archivo); }); }
-  const w0 = img.width, h0 = img.height, cv = document.createElement('canvas'), cx = cv.getContext('2d');
-  const webp = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp');
-  let lado = 1280, q = 0.72, url = '';
-  for (let i = 0; i < 12; i++) {
-    const f = Math.min(1, lado / Math.max(w0, h0)); cv.width = Math.round(w0 * f); cv.height = Math.round(h0 * f);
-    cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
-    url = cv.toDataURL(webp ? 'image/webp' : 'image/jpeg', q);
-    if (url.length <= LIMITE_FOTO) return url;
-    if (q > 0.45) q -= 0.1; else lado = Math.round(lado * 0.8);
-  }
-  if (url.length > LIMITE_FOTO) throw new Error('No se pudo achicar la foto lo suficiente.');
-  return url;
-}
-$('btnFoto').addEventListener('click', () => { if (fotos.length >= 3) return toast('Máximo 3 fotos por registro.'); $('fotoInput').click(); });
-$('fotoInput').addEventListener('change', async e => {
+$('btnFoto').addEventListener('click', () => { if (fotos.length >= 3) return toast('Máximo 3 fotos por registro.'); guardarBorrador(); $('fotoCamara').click(); });
+$('btnGaleria').addEventListener('click', () => { if (fotos.length >= 3) return toast('Máximo 3 fotos por registro.'); guardarBorrador(); $('fotoGaleria').click(); });
+['fotoCamara', 'fotoGaleria'].forEach(id => $(id).addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try { toast('Comprimiendo foto…'); fotos.push(await comprimirFoto(f)); pintarFotos(); toast(`Foto lista (${Math.round(fotos.at(-1).length * 0.75 / 1024)} KB)`); }
+  try { toast('Comprimiendo foto…'); fotos.push(await comprimirFoto(f)); pintarFotos(); guardarBorrador(); toast(`Foto lista (${Math.round(fotos.at(-1).length * 0.75 / 1024)} KB)`); }
   catch (err) { toast(err.message || 'No se pudo leer la foto.'); }
-});
+}));
+/* Borrador: el formulario se guarda en el teléfono mientras se llena; si la app se reinicia (por ejemplo al abrir la cámara), se recupera */
+const CAMPOS_BORRADOR = ['tipoEntrada', 'movCodigo', 'movNombre', 'movUnidad', 'movMinimo', 'movCantidad', 'movUbic', 'movDestino', 'movRef', 'movNota'];
+const claveBorrador = () => 'rackman-borrador-' + (yo?.email || '');
+function guardarBorrador() {
+  if (!yo) return;
+  const campos = Object.fromEntries(CAMPOS_BORRADOR.map(id => [id, $(id).value]));
+  const vacio = !fotos.length && !['movCodigo', 'movNombre', 'movCantidad', 'movUbic', 'movDestino', 'movNota'].some(id => campos[id].trim());
+  try { if (vacio) localStorage.removeItem(claveBorrador()); else localStorage.setItem(claveBorrador(), JSON.stringify({ t: ahora(), mov, campos, fotos })); } catch (e) {}
+}
+function borrarBorrador() { try { localStorage.removeItem(claveBorrador()); } catch (e) {} }
+let borradorRevisado = false;
+function recuperarBorrador() {
+  if (borradorRevisado || !yo) return; borradorRevisado = true;
+  let b = null; try { b = JSON.parse(localStorage.getItem(claveBorrador())); } catch (e) {}
+  if (!b || ahora() - b.t > 12 * 36e5) { borrarBorrador(); return; }
+  mov = b.mov === 'ajuste' ? 'entrada' : b.mov; Object.entries(b.campos || {}).forEach(([id, v]) => { if ($(id)) $(id).value = v; }); fotos = Array.isArray(b.fotos) ? b.fotos.slice(0, 3) : [];
+  document.querySelectorAll('#segMov button').forEach(x => x.classList.toggle('activo', x.dataset.mov === mov));
+  document.querySelector('#pestanas [data-tab="registrar"]').click(); toast('Recuperé lo que estabas cargando.');
+}
+$('formMov').addEventListener('input', guardarBorrador); $('formMov').addEventListener('change', guardarBorrador);
 function pintarFotos() {
   $('fotosPrevia').innerHTML = fotos.map((f, i) => `<span class="foto-x"><img src="${f}" alt="Foto ${i + 1}"><button type="button" data-quitar-foto="${i}" aria-label="Quitar foto">×</button></span>`).join('');
-  $('btnFoto').disabled = fotos.length >= 3;
+  $('btnFoto').disabled = $('btnGaleria').disabled = fotos.length >= 3;
 }
-$('fotosPrevia').addEventListener('click', e => { const b = e.target.closest('[data-quitar-foto]'); if (!b) return; fotos.splice(+b.dataset.quitarFoto, 1); pintarFotos(); });
+$('fotosPrevia').addEventListener('click', e => { const b = e.target.closest('[data-quitar-foto]'); if (!b) return; fotos.splice(+b.dataset.quitarFoto, 1); pintarFotos(); guardarBorrador(); });
 
 async function enviarPropuesta(datos) {
   const id = nid('P'), p = { id, ...datos, usuario: yo.email, nombreUsuario: String(yo.nombre).slice(0, 80), fecha: TS(), fotos: fotos.length };
@@ -655,7 +681,7 @@ $('btnEnviar').addEventListener('click', async () => {
     }
     btn.disabled = true;
     await enviarPropuesta(datos);
-    ['movCodigo', 'movNombre', 'movCantidad', 'movNota', 'movRef', 'movDestino'].forEach(id => $(id).value = ''); fotos = [];
+    ['movCodigo', 'movNombre', 'movCantidad', 'movNota', 'movRef', 'movDestino'].forEach(id => $(id).value = ''); fotos = []; borrarBorrador();
     pintarRegistrar(); toast('Enviado. Queda pendiente de aprobación.');
   } catch (err) { toast(err.code === 'PERMISSION_DENIED' || /permission/i.test(err.message) ? 'La base rechazó el registro (sin permiso o código inválido).' : err.message || 'No se pudo enviar.'); }
   finally { btn.disabled = false; }
@@ -716,7 +742,7 @@ async function anotar(kid, l) {
 $('segReg').addEventListener('click', e => { const b = e.target.closest('[data-reg]'); if (!b) return; verReg = b.dataset.reg; document.querySelectorAll('#segReg button').forEach(x => x.classList.toggle('activo', x === b)); pintarRegistros(); });
 function pintarRegistros() {
   const ps = lista(propuestas()).filter(p => verReg === 'todos' || p.usuario === yo.email).sort((a, b) => b.fecha - a.fecha);
-  $('tablaReg').innerHTML = ps.length ? ps.slice(0, 300).map(p => { const e = estadoProp(p); return `<tr class="click" data-prop="${p.id}"><td>${fmtF(p.fecha)}</td><td>${resumenProp(p)}${p.fotos ? ` · 📷 ${p.fotos}` : ''}</td><td style="font-size:13px">${esc(p.nombreUsuario)}</td><td><span class="etq ${e.clase}">${e.texto}</span></td></tr>`; }).join('')
+  $('tablaReg').innerHTML = ps.length ? ps.slice(0, 300).map(p => { const e = estadoProp(p); return `<tr class="click" data-prop="${p.id}"><td>${fmtF(p.fecha)}</td><td>${resumenProp(p)}${nFotos(p) ? ` · 📷 ${nFotos(p)}` : ''}</td><td style="font-size:13px">${esc(p.nombreUsuario)}</td><td><span class="etq ${e.clase}">${e.texto}</span></td></tr>`; }).join('')
     : '<tr><td colspan="4" class="ayuda">No hay registros.</td></tr>';
 }
 document.addEventListener('click', async e => { const tr = e.target.closest('[data-prop]'); if (!tr) return; e.preventDefault();

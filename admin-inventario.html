@@ -174,6 +174,7 @@
     <!-- STOCK -->
     <section data-panel="stock" hidden>
       <h2>Stock oficial</h2>
+      <div class="botones" style="margin:-4px 0 12px"><button class="btn acento chico" data-excel>Exportar a Excel</button></div>
       <input class="buscador" id="buscarStock" type="search" placeholder="Buscar por nombre, código o ubicación…">
       <div class="caja tabla-cont"><table><thead><tr><th>Código</th><th>Artículo</th><th class="num">Stock</th><th class="num">Pendiente</th><th>Ubicaciones</th><th>Flujo</th></tr></thead><tbody id="tablaStock"></tbody></table></div>
     </section>
@@ -232,6 +233,7 @@
     <!-- COMPROBANTES -->
     <section data-panel="comprobantes" hidden>
       <h2>Comprobantes</h2>
+      <div class="botones" style="margin:-4px 0 12px"><button class="btn acento chico" data-excel>Exportar a Excel</button></div>
       <input class="buscador" id="buscarComp" type="search" placeholder="Buscar por número, artículo, usuario o nota…">
       <div class="caja tabla-cont"><table><thead><tr><th>N.º</th><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Origen</th><th></th></tr></thead><tbody id="tablaComp"></tbody></table></div>
     </section>
@@ -501,8 +503,29 @@ function resumenProp(p) {
   if (p.tipo === 'salida') return `Salida · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} · ${p.cantidad} u${p.ubicacion ? ` desde <span class="mono">${esc(p.ubicacion)}</span>` : ''}`;
   return `Ajuste · <span class="mono">${esc(p.codigo)}</span> ${esc(artPorCodigo(p.codigo)?.nombre || '')} en <span class="mono">${esc(p.ubicacion)}</span>: hay ${p.cantidadReal} en realidad`;
 }
+/* Fotos: se reducen y comprimen en el celular antes de guardarlas (≈ 30–60 KB cada una) */
+const LIMITE_FOTO = 80000; // caracteres del texto de la imagen (≈ 60 KB)
+async function comprimirFoto(archivo) {
+  let img;
+  try { img = await createImageBitmap(archivo, { imageOrientation: 'from-image' }); }
+  catch (e) { img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = URL.createObjectURL(archivo); }); }
+  const w0 = img.width, h0 = img.height, cv = document.createElement('canvas'), cx = cv.getContext('2d');
+  const webp = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp');
+  let lado = 1280, q = 0.72, url = '';
+  for (let i = 0; i < 12; i++) {
+    const f = Math.min(1, lado / Math.max(w0, h0)); cv.width = Math.round(w0 * f); cv.height = Math.round(h0 * f);
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+    url = cv.toDataURL(webp ? 'image/webp' : 'image/jpeg', q);
+    if (url.length <= LIMITE_FOTO) return url;
+    if (q > 0.45) q -= 0.1; else lado = Math.round(lado * 0.8);
+  }
+  if (url.length > LIMITE_FOTO) throw new Error('No se pudo achicar la foto lo suficiente.');
+  return url;
+}
+/* Fotos de un registro: las que mandó el funcionario más las que adjuntó el administrador */
+const nFotos = p => Math.max(p.fotos || 0, oficial('adjuntos')[p.id] || 0);
 async function htmlFotos(p) {
-  if (!p.fotos) return '';
+  if (!nFotos(p)) return '';
   try { const fs = await Datos.fotos(p.id); return `<div class="fotos">${fs.map(f => `<img src="${esc(f)}" alt="Foto adjunta" data-ampliar>`).join('')}</div>`; }
   catch (e) { return '<p class="ayuda">No se pudieron cargar las fotos.</p>'; }
 }
@@ -757,7 +780,7 @@ function pintarBandeja() {
       ${verBandeja === 'pend' ? `<input type="checkbox" class="marca" data-sel="${p.id}" ${seleccion.has(p.id) ? 'checked' : ''} aria-label="Seleccionar">` : ''}
       <span class="etq ${p.tipo === 'entrada' ? 'in' : p.tipo === 'salida' ? 'out' : p.tipo === 'traslado' ? 'tr' : 'aj'}">${TIPOS_PROP[p.tipo]}</span>
       ${verBandeja === 'rev' ? `<span class="etq ${est.clase}">${est.texto}</span>` : ''}
-      <span class="ayuda" style="margin:0">${fmtF(p.fecha)} · ${esc(p.nombreUsuario)}${p.fotos ? ` · 📷 ${p.fotos}` : ''}${p.codigoTemporal ? ` · código <span class="mono">${esc(p.codigoTemporal)}</span>` : ''}</span>
+      <span class="ayuda" style="margin:0">${fmtF(p.fecha)} · ${esc(p.nombreUsuario)}${nFotos(p) ? ` · 📷 ${nFotos(p)}` : ''}${p.codigoTemporal ? ` · código <span class="mono">${esc(p.codigoTemporal)}</span>` : ''}</span>
       <span class="der">${verBandeja === 'pend' ? `<button class="btn chico acento" data-aprobar="${p.id}" ${dg.problemas.length ? 'disabled' : ''}>Aprobar</button><button class="btn chico sec" data-prop="${p.id}">Revisar</button>` : `<button class="btn chico sec" data-prop="${p.id}">Ver</button>`}</span></div>
       <p style="margin-top:6px">${resumenProp(p)}</p>${p.nota ? `<p class="ayuda" style="margin:2px 0 0">Nota: ${esc(p.nota)}</p>` : ''}
       ${verBandeja === 'pend' ? dg.problemas.map(t => `<p class="alerta">✕ ${esc(t)}</p>`).join('') + dg.avisos.map(t => `<p class="ayuda" style="margin:2px 0 0">⚠ ${esc(t)}</p>`).join('') : r?.motivo ? `<p class="ayuda" style="margin:2px 0 0">${esc(r.motivo)}</p>` : ''}
@@ -789,7 +812,8 @@ async function revisar(pid) {
   abrirModal(`<h2>${TIPOS_PROP[p.tipo]}${p.tipo === 'entrada' ? ` · ${TIPOS[p.subtipo]}` : ''}</h2><p><span class="etq ${est.clase}">${est.texto}</span></p>
     <p style="margin-top:8px">${resumenProp(p)}</p>${p.nota ? `<p>Nota: ${esc(p.nota)}</p>` : ''}${p.ref ? `<p>Comprobante de origen: <span class="mono">${esc(p.ref)}</span></p>` : ''}
     <p class="ayuda">Registrado por ${esc(p.nombreUsuario)} (${esc(p.usuario)}) el ${fmtF(p.fecha)}${p.codigoTemporal ? ` con el código <span class="mono">${esc(p.codigoTemporal)}</span>` : ''}</p>
-    <div id="fotosProp"><p class="ayuda">${p.fotos ? 'Cargando fotos…' : 'Sin fotos.'}</p></div>
+    <div id="fotosProp"><p class="ayuda">${nFotos(p) ? 'Cargando fotos…' : 'Sin fotos.'}</p></div>
+    <div class="botones no-imprimir"><input type="file" id="adjFoto" accept="image/*" hidden><button class="btn sec chico" id="btnAdjFoto" ${nFotos(p) >= 3 ? 'disabled' : ''}>Adjuntar foto recibida (WhatsApp, mail…)</button></div>
     ${r ? `<div class="aviso ${r.estado === 'rechazada' ? 'mal' : 'ok'}">${r.estado === 'rechazada' ? 'Rechazada' : 'Aprobada'} el ${fmtF(r.fecha)}${r.motivo ? `: ${esc(r.motivo)}` : '.'}${r.corregido ? ' Con correcciones.' : ''}${r.comprobante ? ` <a href="#" data-comp="${r.comprobante}" class="mono">Comprobante N.º ${nro(r.numero)}</a>` : ''}</div>` : `
     <div class="caja" style="margin-top:12px"><h3>Corregir antes de aprobar (opcional)</h3>
       <div class="fila dos">${campo('rvCodigo', 'Código', p.codigo, 'class="mono"')}${p.tipo === 'ajuste' ? campo('rvCant', 'Cantidad real', p.cantidadReal, 'type="number" min="0"') : campo('rvCant', 'Cantidad', p.cantidad, 'type="number" min="1"')}</div>
@@ -813,7 +837,13 @@ async function revisar(pid) {
     $('rvAprobar').onclick = async () => { try { const c = await aprobar(pid, leer(), $('rvNota').value.trim()); cerrarModal(); toast(c ? `Aprobado: comprobante N.º ${nro(c.numero)}` : 'Cerrado sin cambios'); } catch (err) { toast(err.message); } };
     $('rvRechazar').onclick = async () => { const m = $('rvNota').value.trim() || prompt('Motivo del rechazo (lo ve el funcionario):'); if (m === null) return; try { await rechazar(pid, m); cerrarModal(); toast('Rechazado'); } catch (err) { toast(err.message); } };
   }
-  $('fotosProp').innerHTML = p.fotos ? await htmlFotos(p) : '';
+  $('btnAdjFoto').onclick = () => $('adjFoto').click();
+  $('adjFoto').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const n = nFotos(p); if (n >= 3) return toast('Ya tiene 3 fotos.');
+    try { toast('Comprimiendo foto…'); const url = await comprimirFoto(f);
+      await Datos.escribir({ [`inv_fotos/${pid}/${n}`]: url, [`${OF}adjuntos/${pid}`]: n + 1 }); toast('Foto adjuntada'); revisar(pid); }
+    catch (err) { toast(err.message || 'No se pudo adjuntar la foto.'); } };
+  $('fotosProp').innerHTML = nFotos(p) ? await htmlFotos(p) : '';
 }
 
 /* ---------- Stock ---------- */
@@ -927,6 +957,42 @@ $('btnRegistrar').addEventListener('click', async () => {
     verComprobante(comp.id);
   } catch (err) { toast(err.message || 'No se pudo registrar.'); }
 });
+
+/* ---------- Exportar a Excel: todo el stock oficial en hojas listas para calcular ---------- */
+document.addEventListener('click', async e => { const b = e.target.closest('[data-excel]'); if (!b) return; b.disabled = true;
+  try { await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); exportarExcel(); }
+  catch (err) { toast('Se necesita conexión para generar el Excel.'); } finally { b.disabled = false; } });
+function exportarExcel() {
+  const F = t => t ? new Date(t) : null, U = id => ubic(id), dias = +$('periodo').value || 30, inm = +$('diasInmovil').value || 60;
+  const flujo = Object.fromEntries(analisisFlujo(dias, inm).map(f => [f.a.id, f]));
+  const pend = pendientePor();
+  const stock = lista(oficial('articulos')).sort((x, y) => x.nombre.localeCompare(y.nombre)).map(a => { const s = stockDe(a.id), f = flujo[a.id];
+    return { 'Código': a.codigo, 'Artículo': a.nombre, 'Unidad': a.unidad, 'Stock': s, 'Mínimo': a.minimo || 0, 'Bajo mínimo': a.minimo && s > 0 && s <= a.minimo ? 'Sí' : 'No',
+      'Pendiente de aprobar': pend[a.id] || 0, 'Proyectado': s + (pend[a.id] || 0), [`Salidas últimos ${dias} días`]: f ? f.salidas : 0, 'Último egreso': f && f.ultimo ? F(f.ultimo) : null,
+      'Flujo': a.inactivo ? 'Dado de baja' : f ? ETQ[f.clase] : '', 'Estado': a.inactivo ? 'De baja' : 'Activo', 'Alta': F(a.alta) }; });
+  const porUb = []; lista(oficial('articulos')).forEach(a => Object.entries(porUbicacion(a.id)).forEach(([uid, v]) => { if (!v) return; const u = U(uid);
+    porUb.push({ 'Código': a.codigo, 'Artículo': a.nombre, 'Unidad': a.unidad, 'Ubicación': u?.codigo || 'sin ubicación', 'Nombre de la ubicación': u?.nombre || '', 'Cantidad': v }); }));
+  porUb.sort((x, y) => x['Ubicación'].localeCompare(y['Ubicación']) || x['Artículo'].localeCompare(y['Artículo']));
+  const comps = oficial('comprobantes'), numDe = id => { const c = Object.values(comps).find(x => x.items?.some(i => i.lote === id && (i.loteNuevo || i.negativo))); return c ? c.numero : null; };
+  const lotes = lista(oficial('lotes')).sort((x, y) => x.fecha - y.fecha).map(l => { const a = art(l.articulo), u = U(l.ubicacion);
+    return { 'Lote': l.id.slice(-6).toUpperCase(), 'Código': a?.codigo || '', 'Artículo': a?.nombre || '', 'Ubicación': u?.codigo || '', 'Fecha de ingreso': F(l.fecha), 'Tipo': l.negativo ? 'Faltante' : TIPOS[l.tipo] || l.tipo || '',
+      'Cantidad inicial': l.cantidad, 'Restante': l.restante, 'Comprobante N.º': numDe(l.id), 'Viene del lote': l.origen ? l.origen.slice(-6).toUpperCase() : '' }; });
+  const movs = lista(comps).sort((x, y) => x.numero - y.numero).map(c => { const a = art(c.articulo);
+    const signoCant = c.tipo === 'egreso' ? -c.cantidad : c.tipo === 'traslado' || c.tipo === 'anulacion' ? 0 : c.cantidad;
+    return { 'N.º': c.numero, 'Fecha': F(c.fecha), 'Tipo': TIPOS[c.tipo], 'Código': a?.codigo || '', 'Artículo': a?.nombre || '', 'Cantidad': c.cantidad, 'Efecto en stock total': c.anulado ? 0 : signoCant,
+      'Ubicación / origen': U(c.ubicacion)?.codigo || '', 'Destino': c.tipo === 'traslado' ? U(c.destino)?.codigo || '' : '', 'Antes (ajuste)': c.tipo === 'ajuste' ? c.antes : null, 'Después (ajuste)': c.tipo === 'ajuste' ? c.despues : null,
+      'Registrado en almacén por': c.nombrePropuso || '', 'Aprobado / hecho por': c.nombreUsuario || c.usuario, 'Anulado': c.anulado ? `Sí (N.º ${c.anuladoCon})` : c.tipo === 'anulacion' ? `Anula N.º ${c.anulaNumero}` : 'No',
+      'Código temporal': c.codigo || '', 'Nota': c.nota || '' }; });
+  const ubics = ubicacionesOrdenadas().map(u => ({ 'Código': u.codigo, 'Nombre': u.nombre || '', 'Descripción': u.descripcion || '', 'Unidades': lista(oficial('lotes')).filter(l => l.ubicacion === u.id).reduce((s, l) => s + l.restante, 0) }));
+  const wb = XLSX.utils.book_new();
+  const hoja = (filas, nombre, anchos) => { const ws = XLSX.utils.json_to_sheet(filas.length ? filas : [{ '': 'Sin datos' }], { cellDates: true, dateNF: 'dd/mm/yyyy hh:mm' });
+    if (filas.length) { ws['!cols'] = Object.keys(filas[0]).map(k => ({ wch: anchos?.[k] || Math.min(40, Math.max(k.length + 2, ...filas.slice(0, 200).map(f => String(f[k] ?? '').length + 1))) }));
+      ws['!autofilter'] = { ref: ws['!ref'] }; } XLSX.utils.book_append_sheet(wb, ws, nombre); };
+  hoja(stock, 'Stock'); hoja(porUb, 'Stock por ubicación'); hoja(lotes, 'Lotes'); hoja(movs, 'Movimientos'); hoja(ubics, 'Ubicaciones');
+  const d = new Date(), f2 = n => String(n).padStart(2, '0');
+  XLSX.writeFile(wb, `stock-rackman-${d.getFullYear()}-${f2(d.getMonth() + 1)}-${f2(d.getDate())}.xlsx`, { cellDates: true });
+  toast('Excel generado');
+}
 
 /* ---------- Comprobantes ---------- */
 function pintarComprobantes() {
